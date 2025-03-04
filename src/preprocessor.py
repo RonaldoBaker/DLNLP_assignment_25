@@ -159,4 +159,8 @@ class Preprocessor:
         eng_vocab = build_vocab_from_iterator(eng_tokens, specials=special_tokens, min_freq=2)
         spa_vocab = build_vocab_from_iterator(spa_tokens, specials=special_tokens, min_freq=2)
 
+        # Set unknown token index as default index
+        eng_vocab.set_default_index(eng_vocab["<unk>"])
+        spa_vocab.set_default_index(spa_vocab["<unk>"])
+
         return eng_vocab, spa_vocab
