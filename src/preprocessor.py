@@ -142,22 +142,21 @@ class Preprocessor:
     
 
     @staticmethod
-    def create_tokenised_dataset(eng_tokeniser: spacy.language.Language,
-                                 spa_tokeniser: spacy.language.Language,
-                                 translation_dictionary: dict[str, str]
-                                 ) -> list[dict[str, str]]:
+    def create_tokenised_dataset(translation_dictionary: dict[str, str]) -> list[dict[str, str]]:
         """
         Wraps the __create tokens function into a lambda function
         and tokenises the parallel sentences in the given dictionary
 
         Args:
-            - eng_tokeniser (spacy.language.Language): The English tokeniser
-            - spa_tokeniser (spacy.language.Language): The Spanish tokeniser
             - translation_dictionary (dict[str, str]): The dictionary containing the parallel sentences
 
         Returns:
             - (list[dict[str, str]]): The tokenised parallel sentences as a list of dictionaries
         """
+         # Create spacy tokenisers
+        spa_tokeniser = spacy.load("es_core_news_sm")
+        eng_tokeniser = spacy.load("en_core_web_sm")
+
         return list(map(lambda x: Preprocessor.__create_tokens(x, eng_tokeniser, spa_tokeniser, sos_token="<sos>", eos_token="<eos>"),translation_dictionary))
         
 
