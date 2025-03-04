@@ -146,6 +146,18 @@ class Preprocessor:
                                  spa_tokeniser: spacy.language.Language,
                                  translation_dictionary: dict[str, str]
                                  ) -> list[dict[str, str]]:
+        """
+        Wraps the __create tokens function into a lambda function
+        and tokenises the parallel sentences in the given dictionary
+
+        Args:
+            - eng_tokeniser (spacy.language.Language): The English tokeniser
+            - spa_tokeniser (spacy.language.Language): The Spanish tokeniser
+            - translation_dictionary (dict[str, str]): The dictionary containing the parallel sentences
+
+        Returns:
+            - (list[dict[str, str]]): The tokenised parallel sentences as a list of dictionaries
+        """
         return list(map(lambda x: Preprocessor.__create_tokens(x, eng_tokeniser, spa_tokeniser, sos_token="<sos>", eos_token="<eos>"),translation_dictionary))
         
 
@@ -180,6 +192,17 @@ class Preprocessor:
 
     @staticmethod
     def __token_to_index(data: dict[str, str], eng_vocab: Vocab, spa_vocab: Vocab):
+        """
+        Maps the tokens to their corresponding indices using the vocabulary.
+
+        Args:
+            - data (dict[str, str]): The dictionary containing the tokens
+            - eng_vocab (Vocab): The English vocabulary
+            - spa_vocab (Vocab): The Spanish vocabulary
+        
+        Returns:
+            - (dict[str, str]): The uypdated dictionary containing the indices
+        """
         # Use in-built numericalization methods to convert tokens to indices
         eng_ids = eng_vocab.lookup_indices(data["eng_tokens"])
         spa_ids = spa_vocab.lookup_indices(data["spa_tokens"])
@@ -192,4 +215,16 @@ class Preprocessor:
 
     @staticmethod
     def numericalise(tokenised_data: list[dict[str, str]], eng_vocab: Vocab, spa_vocab: Vocab) -> list[dict]:
+        """
+        Wraps the __token_to_index function into a lambda function
+        and converts the tokenised data to indices using the vocabulary.
+
+        Args:
+            - tokenised_data (list[dict[str, str]]): The tokenised data
+            - eng_vocab (Vocab): The English vocabulary
+            - spa_vocab (Vocab): The Spanish vocabulary
+
+        Returns:
+            - (list[dict]): The tokenised data as a list of dictionaries containing the indices
+        """
         return list(map(lambda x: Preprocessor.__token_to_index(x, eng_vocab, spa_vocab), tokenised_data))
