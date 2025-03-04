@@ -7,7 +7,8 @@ such as file reading, tokenisation, vocabulary creation, etc.
 import json
 import string
 import spacy
-from torchtext.vocab import Vocab, build_vocab_from_iterator
+import torchtext ; torchtext.disable_torchtext_deprecation_warning()
+from torchtext.vocab import Vocab, build_vocab_from_iterator  # noqa: E402
 
 class Preprocessor:
     """
@@ -31,8 +32,10 @@ class Preprocessor:
     
 
     @staticmethod
-    def create_parallel_data(text: list[str], format: str, save: bool = False) -> list[dict[str, str]]:
-        # TODO: Come back to this and see if I still need the tuple version so that I can remove it and fix the return type
+    def create_parallel_data(text: list[str], format: str, save: bool = False
+                             ) -> list[dict[str, str]]:
+        # TODO: Come back to this and see if I still need the tuple version so that I can
+        # remove it and fix the return type
         """
         Creates a dictionary of parallel sentences between source and target
         languages from a list of strings.
@@ -103,9 +106,9 @@ class Preprocessor:
 
 
     @staticmethod
-    def create_tokens(pair: dict[str, str],
-                      eng_tokeniser: spacy.langugage.Language,
-                      spa_tokeniser: spacy.langugage.Language,
+    def __create_tokens(pair: dict[str, str],
+                      eng_tokeniser: spacy.language.Language,
+                      spa_tokeniser: spacy.language.Language,
                       sos_token: str,
                       eos_token: str,
                       max_length: int = 100
@@ -136,6 +139,14 @@ class Preprocessor:
         pair.update({"eng_tokens": eng_tokens, "spa_tokens": spa_tokens})
         return pair
     
+
+    @staticmethod
+    def create_tokenised_dataset(eng_tokeniser: spacy.language.Language,
+                                 spa_tokeniser: spacy.language.Language,
+                                 translation_dictionary: dict[str, str]
+                                 ) -> list[dict[str, str]]:
+        return list(map(lambda x: Preprocessor.__create_tokens(x, eng_tokeniser, spa_tokeniser, sos_token="<sos>", eos_token="<eos>"),translation_dictionary))
+        
 
     @staticmethod
     def build_vocab(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
