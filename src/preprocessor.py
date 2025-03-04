@@ -6,6 +6,8 @@ such as file reading, tokenisation, vocabulary creation, etc.
 # Import necessary libraries
 import json
 import string
+import spacy
+from torchtext.vocab import Vocab, build_vocab_from_iterator
 
 class Preprocessor:
     """
@@ -82,3 +84,46 @@ class Preprocessor:
             file.close()
 
         return data
+
+
+    @staticmethod
+    def create_tokens(pair: dict[str, str],
+                      eng_tokeniser: spacy.langugage.Language,
+                      spa_tokeniser: spacy.langugage.Language,
+                      sos_token: str,
+                      eos_token: str,
+                      max_length: int = 100
+                      ) -> dict[str, str]:
+        """
+        Tokenises the sentences in the given pair of parallel sentences
+        and returns the tokenised sentences as a dictionary.
+        """
+        # Tokenise the text
+        eng_tokens = [token.text for token in eng_tokeniser.tokenizer(pair["eng"])][:max_length]
+        spa_tokens = [token.text for token in spa_tokeniser.tokenizer(pair["spa"])][:max_length]
+
+        # Add the start of sentence and end of sentence tokens
+        eng_tokens = [sos_token] + eng_tokens + [eos_token]
+        spa_tokens = [sos_token] + spa_tokens + [eos_token]
+
+        pair.update({"eng_tokens": eng_tokens, "spa_tokens": spa_tokens})
+        return pair
+    
+
+    @staticmethod
+    def build_vocab(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
+        """
+        Builds the vocabulary for the source and target languages
+        from the tokenised data and returns the vocabulary of each language.
+        """
+        # Define special tokens
+        special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
+
+        eng_tokens = [parallel_dict["eng_tokens"] for parallel_dict in tokenised_data]
+        spa_tokens = [parallel_dict["spa_tokens"] for parallel_dict in tokenised_data]
+
+        # Build the vocabulary
+        eng_vocab = build_vocab_from_iterator(eng_tokens, specials=special_tokens, min_freq=2)
+        spa_vocab = build_vocab_from_iterator(spa_tokens, specials=special_tokens, min_freq=2)
+
+        return eng_vocab, spa_vocab
