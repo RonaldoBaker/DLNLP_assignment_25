@@ -36,6 +36,15 @@ class Preprocessor:
         """
         Creates a dictionary of parallel sentences between source and target
         languages from a list of strings.
+
+        Args:
+            - text (list[str]): The list of strings containing the parallel sentences
+            - format (str): The format in which to return the parallel sentences
+                            (either "dict" or "tuple")
+            - save (bool): Whether to save the parallel sentences to a JSON file or not
+
+        Returns:
+            - (list[dict[str, str]]): The parallel sentences as a list of dictionaries or tuples
         """
         # Empty dictionary to store the parallel sentences
         # (from source language to target language)
@@ -75,9 +84,16 @@ class Preprocessor:
 
     @staticmethod
     def load_dataset(path: str) -> list[dict[str, str]]:
+        # TODO: check if I am removing the tuple version of this method
         """
         Loads the dataset from the given path and returns the parallel
         sentences as a list of dictionaries.
+
+        Args:
+            - path (str): The path to the dataset file
+
+        Returns:
+            - (list[dict[str, str]]): The parallel sentences as a list of dictionaries or tuples
         """
         with open(path, "r") as file:
             data = json.load(file)
@@ -97,6 +113,17 @@ class Preprocessor:
         """
         Tokenises the sentences in the given pair of parallel sentences
         and returns the tokenised sentences as a dictionary.
+
+        Args:
+            - pair (dict[str, str]): The pair of parallel sentences
+            - eng_tokeniser (spacy.langugage.Language): The English tokeniser
+            - spa_tokeniser (spacy.langugage.Language): The Spanish tokeniser
+            - sos_token (str): The start of sentence token
+            - eos_token (str): The end of sentence token
+            - max_length (int): The maximum length of the tokenised sentences
+
+        Returns:
+            - (dict[str, str]): The tokenised sentences as a dictionary
         """
         # Tokenise the text
         eng_tokens = [token.text for token in eng_tokeniser.tokenizer(pair["eng"])][:max_length]
@@ -115,6 +142,12 @@ class Preprocessor:
         """
         Builds the vocabulary for the source and target languages
         from the tokenised data and returns the vocabulary of each language.
+
+        Args:
+            - tokenised_data (list[dict[str, str]]): The tokenised data
+
+        Returns:
+            - (tuple[Vocab, Vocab]): The vocabulary for the source and target languages
         """
         # Define special tokens
         special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
