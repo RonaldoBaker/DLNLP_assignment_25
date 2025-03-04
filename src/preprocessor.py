@@ -7,7 +7,8 @@ such as file reading, tokenisation, vocabulary creation, etc.
 import json
 import string
 import spacy
-import torchtext ; torchtext.disable_torchtext_deprecation_warning()
+import torchtext
+torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab, build_vocab_from_iterator  # noqa: E402
 
 class Preprocessor:
@@ -175,3 +176,20 @@ class Preprocessor:
         spa_vocab.set_default_index(spa_vocab["<unk>"])
 
         return eng_vocab, spa_vocab
+
+
+    @staticmethod
+    def __token_to_index(data: dict[str, str], eng_vocab: Vocab, spa_vocab: Vocab):
+        # Use in-built numericalization methods to convert tokens to indices
+        eng_ids = eng_vocab.lookup_indices(data["eng_tokens"])
+        spa_ids = spa_vocab.lookup_indices(data["spa_tokens"])
+
+        # Update the dictionary with the indices
+        data.update({"eng_ids": eng_ids, "spa_ids": spa_ids})
+
+        return data
+
+
+    @staticmethod
+    def numericalise(tokenised_data: list[dict[str, str]], eng_vocab: Vocab, spa_vocab: Vocab) -> list[dict]:
+        return list(map(lambda x: Preprocessor.__token_to_index(x, eng_vocab, spa_vocab), tokenised_data))
