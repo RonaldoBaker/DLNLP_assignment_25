@@ -1,6 +1,8 @@
 # Import dependencies
-import spacy
+from functools import partial
+from torch.utils.data import DataLoader
 from src.preprocessor import Preprocessor
+from src.custom_dataset import TranslationDataset, collate_fn
 
 def main():
     # DATA PREPROCESSING
@@ -11,13 +13,8 @@ def main():
     translation_dictionary = Preprocessor.create_parallel_data(text=lines, format="dict", save=False)
     print("Created dictionary of parallel sentences")
 
-    # Create spacy tokenisers
-    spa_tokeniser = spacy.load("es_core_news_sm")
-    eng_tokeniser = spacy.load("en_core_web_sm")
-    print("Loaded spacy tokenisers")
-
     # Tokenise the data
-    tokenised_dataset = Preprocessor.create_tokenised_dataset(eng_tokeniser, spa_tokeniser, translation_dictionary)
+    tokenised_dataset = Preprocessor.create_tokenised_dataset(translation_dictionary)
     print("Dataset tokenised")
 
     # Create vocabulary
@@ -25,6 +22,16 @@ def main():
     print("Vocabulary built")
 
     # Convert the tokenised data to indices
+    indexed_dataset = Preprocessor.numericalise(tokenised_dataset, eng_vocab, spa_vocab)
+    print("Dataset indexed")
+
+    # Create the custom dataset
+    translation_dataset = TranslationDataset(indexed_dataset, eng_vocab, spa_vocab)
+    print("Custom dataset created")
+
+    # Define the dataloader
+    dataloader = DataLoader(translation_dataset, batch_size=32, shuffle=True, collate_fn=partial(collate_fn, source_vocab=eng_vocab, target_vocab=spa_vocab))
+    print("Dataloader created")
 
     # Model training
     # Define the model
