@@ -40,9 +40,8 @@ class Transformer(nn.Module):
         self.device = device
 
     def make_src_mask(self, src):
-        # src shape: (seq_len, N)
+        # src shape (batch size, src_seq_length)
         src_mask = src == self.src_pad_index
-        # src_mask shape: (N, seq_len) needs to be batch size first for transformer
         return src_mask
     
     def forward(self, src, tgt):
