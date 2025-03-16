@@ -30,6 +30,7 @@ if torch.cuda.is_available():
     device = torch.device(f"cuda:{device_num}")
 else:
     device = torch.device("cpu")
+print(f"Running on {device}")
 
 def main():
     # DATA PREPROCESSING
