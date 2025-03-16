@@ -8,13 +8,14 @@ class TranslationDataset(Dataset):
     """
     A custom dataset class for the translation task.
     """
-    def __init__(self, indexed_dataset, source_vocab, target_vocab):
+    def __init__(self, indexed_dataset, source_vocab, target_vocab, device):
         """
         Initialises the dataset with the indexed dataset and the source and target vocabularies.
         """
         self.indexed_dataset = indexed_dataset
         self.source_vocab = source_vocab
         self.target_vocab = target_vocab
+        self.device = device
 
 
     def __len__(self):
@@ -29,8 +30,8 @@ class TranslationDataset(Dataset):
         Returns the indexed source and target sentences at the given index.
         """
         dictionary = self.indexed_dataset[idx]
-        eng_tensor = torch.tensor(dictionary['eng_ids'], dtype=torch.long)
-        spa_tensor = torch.tensor(dictionary['spa_ids'], dtype=torch.long)
+        eng_tensor = torch.tensor(dictionary['eng_ids'], dtype=torch.long, device=self.device)
+        spa_tensor = torch.tensor(dictionary['spa_ids'], dtype=torch.long, device=self.device)
         return eng_tensor, spa_tensor
     
 
