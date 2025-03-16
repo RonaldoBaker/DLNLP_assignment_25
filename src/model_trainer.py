@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+import matplotlib.pyplot as plt
 import torch
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
@@ -80,3 +81,19 @@ class TransformerTrainer():
                     break
 
             print(f"Epoch {epoch + 1} | Train Loss: {self.train_losses[-1]} | Val Loss: {self.val_losses[-1]}")
+
+    def plot_loss_curves(self, epoch_resolution: int, path: str):
+        sampled_epochs = list(range(0, len(self.train_losses), epoch_resolution))
+        sampled_train_losses = self.train_losses[::epoch_resolution]
+        sampled_val_losses = self.val_losses[::epoch_resolution]
+
+        plt.plot(sampled_epochs, sampled_train_losses, label="Training Loss")
+        plt.plot(sampled_epochs, sampled_val_losses, label="Validation Loss")
+        plt.grid()
+        plt.title("Training and Validation Loss Curves")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.legend()
+        if path:
+            plt.savefig(path)
+        plt.show()

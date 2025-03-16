@@ -99,6 +99,9 @@ def main():
     trainer.train()
     print("Model trained")
 
+    # Plot loss curves
+    trainer.plot_loss_curves(epoch_resolution=1, path="")
+
     # Ablation studies on different combinations of embeddings - subword, word and phrase embeddings
     # Train the model with different combinations of embeddings compared to baseline model with just word embeddings
     # Evaluate the model
