@@ -12,7 +12,6 @@ from src.model import Transformer
 from src.model_trainer import TransformerTrainer
 
 # Define the hyperparameters
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 random_seed = 7
 embedding_size = 512
 num_heads = 8
@@ -23,6 +22,14 @@ max_len = 100
 batch_size = 64
 epochs = 100
 lr = 0.0001
+
+# Set device
+if torch.cuda.is_available():
+    device_num = 0
+    torch.cuda.set_device(device_num)
+    device = torch.device(f"cuda:{device_num}")
+else:
+    device = torch.device("cpu")
 
 def main():
     # DATA PREPROCESSING
