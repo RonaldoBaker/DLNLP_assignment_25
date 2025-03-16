@@ -27,7 +27,7 @@ class Preprocessor:
         Returns:
             - content (list[str]): The content of the text file as a list of strings
         """
-        with open(path, "r") as file:
+        with open(file=path, mode="r", encoding="utf-8") as file:
             content = file.readlines()
         return content
     
