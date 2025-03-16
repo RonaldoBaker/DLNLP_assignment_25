@@ -1,0 +1,5 @@
+torch
+torchtext == 0.18.0
+tqdm
+spacy
+scikit-learn
