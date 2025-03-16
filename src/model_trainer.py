@@ -52,7 +52,8 @@ class TransformerTrainer():
                 train_loss += loss.item()
 
             train_loss /= len(self.train_loader)
-            self.scheduler.step(train_loss)
+            self.train_losses.append(train_loss)
+
             
             with torch.no_grad():
                 self.model.eval()
@@ -70,6 +71,7 @@ class TransformerTrainer():
                     val_loss += loss.item()
                 
                 val_loss /= len(self.val_loader)
+                self.scheduler.step(train_loss)
                 self.val_losses.append(val_loss)
 
                 early_stopping(self.val_losses[-1])
