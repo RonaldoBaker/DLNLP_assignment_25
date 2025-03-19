@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import matplotlib.pyplot as plt
 import torch
+from torchtext.data.metrics import bleu_score
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 from src.early_stopping import EarlyStopping
@@ -81,6 +82,42 @@ class TransformerTrainer():
                     break
 
             print(f"Epoch {epoch + 1} | Train Loss: {self.train_losses[-1]} | Val Loss: {self.val_losses[-1]}")
+
+
+    def __translate_sentence(self, sentence, tgt_vocab, max_len=20):
+        self.model.eval()
+        src_tensor = torch.tensor(sentence, dtype=torch.long).to(self.device) # Add batch dimension
+
+        tgt_tokens = [tgt_vocab["<sos>"]] # Start token
+
+        for i in range(max_len):
+            tgt_input  = torch.tensor(tgt_tokens, dtype=torch.long).unsqueeze(0).to(self.device)
+            # tgt_mask = self.model.transformer.generate_square_subsequent_mask(len(tgt_input)).to(self.device)
+
+            with torch.no_grad():
+                print(src_tensor.shape, tgt_input.shape)
+                output = self.model(src_tensor, tgt_input)
+                next_token = output.argmax(dim=-1).item()
+                tgt_tokens.append(next_token)
+
+                if next_token == tgt_vocab["<eos>"]: # End token
+                    break
+
+    def evaluate(self, tgt_vocab, max_len=20):
+        original_sentences = []
+        translated_sentences = []
+
+        for src, tgt in tqdm(self.test_loader, desc="Evaluating Transformer", leave=True):
+            src_sentence = src.tolist()
+            tgt_sentence = tgt.tolist()
+
+            translated_sentence = self.__translate_sentence(src_sentence, tgt_vocab, max_len)
+            original_sentences.append([tgt_sentence]) # BLEU expects a list of reference lists
+            translated_sentences.append(translated_sentence)
+
+        score = bleu_score(translated_sentences, original_sentences)
+        print(f"BLEU Score: {score:.4f}")
+
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):
         sampled_epochs = list(range(0, len(self.train_losses), epoch_resolution))

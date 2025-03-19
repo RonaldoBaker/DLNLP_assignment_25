@@ -96,8 +96,12 @@ def main():
     print("Model trainer created")
 
     # Train the model
-    trainer.train()
+    # trainer.train()
     print("Model trained")
+
+    # Evaluate the model
+    trainer.evaluate(tgt_vocab=spa_vocab)
+    print("Model evaluated")
 
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path="")
