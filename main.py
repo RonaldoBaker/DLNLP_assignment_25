@@ -25,7 +25,7 @@ lr = 0.0001
 
 # Set device
 if torch.cuda.is_available():
-    device_num = 0
+    device_num = 1
     torch.cuda.set_device(device_num)
     device = torch.device(f"cuda:{device_num}")
 else:
@@ -100,11 +100,11 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    # trainer.evaluate(tgt_vocab=spa_vocab)
+    trainer.evaluate(tgt_vocab=spa_vocab)
     print("Model evaluated")
 
     # Plot loss curves
-    # trainer.plot_loss_curves(epoch_resolution=1, path="")
+    # trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
 
     # Ablation studies on different combinations of embeddings - subword, word and phrase embeddings
     # Train the model with different combinations of embeddings compared to baseline model with just word embeddings
