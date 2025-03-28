@@ -54,7 +54,7 @@ def main():
     print("Dataset indexed")
 
     # Create the custom dataset
-    translation_dataset = TranslationDataset(indexed_dataset, eng_vocab, spa_vocab)
+    translation_dataset = TranslationDataset(indexed_dataset, eng_vocab, spa_vocab, device)
     print("Custom dataset created")
 
     # Split the data into train, validation and test sets
@@ -100,11 +100,11 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate(tgt_vocab=spa_vocab)
+    # trainer.evaluate(tgt_vocab=spa_vocab)
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path="")
+    # trainer.plot_loss_curves(epoch_resolution=1, path="")
 
     # Ablation studies on different combinations of embeddings - subword, word and phrase embeddings
     # Train the model with different combinations of embeddings compared to baseline model with just word embeddings
