@@ -86,7 +86,7 @@ class TransformerTrainer():
 
     def __translate_sentence(self, sentence, tgt_vocab, max_len=20):
         self.model.eval()
-        src_tensor = torch.tensor(sentence, dtype=torch.long).to(self.device) # Add batch dimension
+        src_tensor = torch.tensor(sentence, dtype=torch.long).to(self.device)
 
         tgt_tokens = [tgt_vocab["<sos>"]] # Start token
 
@@ -102,6 +102,8 @@ class TransformerTrainer():
 
                 if next_token == tgt_vocab["<eos>"]: # End token
                     break
+
+        return tgt_tokens
 
     def evaluate(self, tgt_vocab, max_len=20):
         original_sentences = []
