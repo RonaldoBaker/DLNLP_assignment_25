@@ -5,6 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import matplotlib.pyplot as plt
 import torch
 from torchtext.data.metrics import bleu_score
+from nltk.translate.bleu_score import corpus_bleu
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
 from src.early_stopping import EarlyStopping
@@ -33,7 +34,7 @@ class TransformerTrainer():
             self.model.train()
             train_loss = 0
 
-            for src, tgt in tqdm(self.train_loader, desc="Training Transformer", leave=True):
+            for src, tgt in tqdm(self.train_loader, desc="Training Transformer", leave=True, unit="batch"):
                 # Move the source and target tensors to the device
                 src = src.to(self.device)
                 tgt = tgt.to(self.device)
@@ -61,7 +62,7 @@ class TransformerTrainer():
                 self.model.eval()
                 val_loss = 0
 
-                for src, tgt in tqdm(self.val_loader, desc="Validating Transformer", leave=True):
+                for src, tgt in tqdm(self.val_loader, desc="Validating Transformer", leave=True, unit="batch"):
                     src = src.to(self.device)
                     tgt = tgt.to(self.device)
 
@@ -82,43 +83,182 @@ class TransformerTrainer():
                     break
 
             print(f"Epoch {epoch + 1} | Train Loss: {self.train_losses[-1]} | Val Loss: {self.val_losses[-1]}")
+            print()
 
 
-    def __translate_sentence(self, sentence, tgt_vocab, max_len=20):
+    def evaluate_bleu_greedy(self, tgt_vocab, src_pad_index, max_len):
+        """
+        Evaluate the model on the test set using BLEU score.
+        
+        Args:
+            test_loader: DataLoader yielding tuples (src, tgt) of shape (batch_size, seq_len).
+            model: The transformer model.
+            device: torch.device.
+            tgt_vocab: Target vocabulary mapping tokens to indices; should contain "<sos>" and "<eos>".
+            src_pad_index: Padding index for the source.
+            max_len: Maximum length for generated translations.
+        
+        Returns:
+            bleu (float): The corpus BLEU score.
+        """
+        # Get the index-to-word mapping from the torchtext Vocab object.
+        # Vocab.itos is a list where index corresponds to the token.
+        itos = tgt_vocab.get_itos()
+
+        # Get start and end token indices using the stoi attribute.
+        tgt_start_token = tgt_vocab["<sos>"]
+        tgt_end_token = tgt_vocab["<eos>"]
+
+        if tgt_start_token is None or tgt_end_token is None:
+            raise ValueError("Target vocabulary must contain <sos> and <eos> tokens.")
+
+        candidates = []
+        references = []
         self.model.eval()
-        src_tensor = torch.tensor(sentence, dtype=torch.long).to(self.device)
+        with torch.no_grad():
+            for src, tgt in tqdm(self.test_loader, desc="Testing Transformer", leave=True, unit="batch"):
+                src = src.to(self.device)
+                batch_size = src.size(0)
+                # Initialize predictions with the start token repeated for the batch.
+                preds = torch.full((batch_size, 1), tgt_start_token, dtype=torch.long, device=self.device)
 
-        tgt_tokens = [tgt_vocab["<sos>"]] # Start token
+                # Auto-regressive decoding loop (using greedy decoding).
+                for _ in range(max_len - 1):
+                    outputs = self.model(src, preds)  # shape: (batch_size, seq_len, vocab_size)
+                    next_token = outputs[:, -1, :].argmax(dim=-1, keepdim=True)
+                    preds = torch.cat([preds, next_token], dim=1)
+                    # If every sequence in the batch has generated the <eos> token, break early.
+                    if (next_token == tgt_end_token).all():
+                        break
 
-        for i in range(max_len):
-            tgt_input  = torch.tensor(tgt_tokens, dtype=torch.long).unsqueeze(0).to(self.device)
-            # tgt_mask = self.model.transformer.generate_square_subsequent_mask(len(tgt_input)).to(self.device)
+                # Process each sequence in the batch.
+                for pred_seq, tgt_seq in zip(preds, tgt):
+                    # Convert prediction token IDs to words, skipping the <sos> token.
+                    pred_tokens = []
+                    for token_id in pred_seq[1:]:
+                        if token_id.item() == tgt_end_token:
+                            break
+                        # Make sure the index is within bounds.
+                        token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
+                        pred_tokens.append(token)
+                    candidates.append(pred_tokens)
 
-            with torch.no_grad():
-                print(src_tensor.shape, tgt_input.shape)
-                output = self.model(src_tensor, tgt_input)
-                next_token = output.argmax(dim=-1).item()
-                tgt_tokens.append(next_token)
+                    # Process the reference translation (skipping the <sos> token).
+                    ref_tokens = []
+                    for token_id in tgt_seq[1:]:
+                        if token_id.item() == tgt_end_token:
+                            break
+                        token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
+                        ref_tokens.append(token)
+                    # corpus_bleu expects a list of reference sentences per candidate.
+                    references.append([ref_tokens])
 
-                if next_token == tgt_vocab["<eos>"]: # End token
-                    break
+        bleu = corpus_bleu(references, candidates)
+        print(f"BLEU score: {bleu:.4f}")
+        return bleu
 
-        return tgt_tokens
 
-    def evaluate(self, tgt_vocab, max_len=20):
-        original_sentences = []
-        translated_sentences = []
+    def evaluate_bleu_beam(self, tgt_vocab, src_pad_index, max_len, beam_width=3):
+        """
+        Evaluate the model on the test set using BLEU score with beam search decoding.
+        
+        Args:
+            tgt_vocab: torchtext Vocab object for the target language. Must contain "<sos>" and "<eos>" tokens.
+            src_pad_index: Padding index for the source.
+            max_len: Maximum length for generated translations.
+            beam_width: Beam width.
+        
+        Returns:
+            bleu (float): The corpus BLEU score.
+        """
+        # Get the index-to-word mapping from the torchtext Vocab object.
+        itos = tgt_vocab.get_itos()
 
-        for src, tgt in tqdm(self.test_loader, desc="Evaluating Transformer", leave=True):
-            src_sentence = src.tolist()
-            tgt_sentence = tgt.tolist()
+        # Retrieve start and end token indices.
+        tgt_start_token = tgt_vocab["<sos>"]
+        tgt_end_token = tgt_vocab["<eos>"]
 
-            translated_sentence = self.__translate_sentence(src_sentence, tgt_vocab, max_len)
-            original_sentences.append([tgt_sentence]) # BLEU expects a list of reference lists
-            translated_sentences.append(translated_sentence)
+        if tgt_start_token is None or tgt_end_token is None:
+            raise ValueError("Target vocabulary must contain <sos> and <eos> tokens.")
 
-        score = bleu_score(translated_sentences, original_sentences)
-        print(f"BLEU Score: {score:.4f}")
+        candidates = []
+        references = []
+        self.model.eval()
+
+        with torch.no_grad():
+            # Iterate over the test set batches.
+            for src, tgt in tqdm(self.test_loader, desc="Testing Transformer with Beam Search", leave=True):
+                src = src.to(self.device)
+                batch_size = src.size(0)
+                # Process each sample in the batch individually.
+                for i in range(batch_size):
+                    src_i = src[i].unsqueeze(0)  # shape: (1, sequence_length)
+                    # Initialize beam with the start token and zero score.
+                    beam = [([tgt_start_token], 0.0)]
+                    finished_candidates = []
+                    # Beam search decoding loop.
+                    for _ in range(max_len - 1):
+                        new_beam = []
+                        for seq, score in beam:
+                            # If the sequence is already finished, keep it.
+                            if seq[-1] == tgt_end_token:
+                                finished_candidates.append((seq, score))
+                                continue
+                            # Convert the current sequence to a tensor.
+                            seq_tensor = torch.tensor(seq, dtype=torch.long, device=self.device).unsqueeze(0)
+                            outputs = self.model(src_i, seq_tensor)  # shape: (1, seq_len, vocab_size)
+                            logits = outputs[:, -1, :]  # get logits at the last time step.
+                            # Compute log probabilities.
+                            log_probs = torch.log_softmax(logits, dim=-1)  # shape: (1, vocab_size)
+
+                            # Get the top beam_width tokens and their log probabilities.
+                            top_log_probs, top_indices = torch.topk(log_probs, beam_width, dim=-1)
+                            top_log_probs = top_log_probs.squeeze(0)
+                            top_indices = top_indices.squeeze(0)
+        
+                            for log_prob, token_idx in zip(top_log_probs, top_indices):
+                                new_seq = seq + [token_idx.item()]
+                                new_score = score + log_prob.item()
+                                new_beam.append((new_seq, new_score))
+                        # If no candidates were expanded, break.
+                        if not new_beam:
+                            break
+                        # Sort candidates by score (highest first) and prune.
+                        new_beam = sorted(new_beam, key=lambda x: x[1], reverse=True)[:beam_width]
+                        beam = new_beam
+                        # If every candidate in the beam has completed the sequence, end early.
+                        if all(seq[-1] == tgt_end_token for seq, _ in beam):
+                            finished_candidates.extend(beam)
+                            break
+                    # Choose the best sequence among finished candidates if available.
+                    if finished_candidates:
+                        best_seq = max(finished_candidates, key=lambda x: x[1])[0]
+                    else:
+                        best_seq = beam[0][0]
+
+                    # Convert token ids (skipping <sos>) into words.
+                    pred_tokens = []
+                    for token_id in best_seq[1:]:
+                        if token_id == tgt_end_token:
+                            break
+                        token = itos[token_id] if token_id < len(itos) else "<unk>"
+                        pred_tokens.append(token)
+                    candidates.append(pred_tokens)
+
+                # Process references for this batch.
+                for tgt_seq in tgt:
+                    ref_tokens = []
+                    for token_id in tgt_seq[1:]:
+                        if token_id.item() == tgt_end_token:
+                            break
+                        token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
+                        ref_tokens.append(token)
+                    # corpus_bleu expects a list of reference sentences per candidate.
+                    references.append([ref_tokens])
+
+        bleu = corpus_bleu(references, candidates)
+        print(f"BLEU score (Beam Search): {bleu:.4f}")
+        return bleu
 
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):
