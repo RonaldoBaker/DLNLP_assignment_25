@@ -60,7 +60,7 @@ class Transformer(nn.Module):
 
         # So that the transformer knows where the padding is
         src_padding_mask = self.make_src_mask(src)
-        trg_mask = self.transformer.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
-        output = self.transformer(src_embedded, tgt_embedded, src_key_padding_mask=src_padding_mask, tgt_mask=trg_mask)
+        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
+        output = self.transformer(src_embedded, tgt_embedded, src_key_padding_mask=src_padding_mask, tgt_mask=tgt_mask)
         output = self.fc(output)
         return output
