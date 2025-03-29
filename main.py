@@ -104,11 +104,11 @@ def main():
     print("Model trainer created")
 
     # Train the model
-    trainer.train(patience=2) # TODO: there seems to be a nested tensor somewhere during training need to debug
+    trainer.train(patience=2)
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate_bleu_greedy(tgt_vocab=spa_vocab, src_pad_index=src_pad_index, max_len=max_len)
+    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy")
     print("Model evaluated")
 
     # Plot loss curves

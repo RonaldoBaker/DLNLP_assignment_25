@@ -1,13 +1,15 @@
 import os
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
+import time
 import matplotlib.pyplot as plt
 import torch
 from torchtext.data.metrics import bleu_score
 from nltk.translate.bleu_score import corpus_bleu
 from torch.nn.utils import clip_grad_norm_
 from tqdm import tqdm
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from src.early_stopping import EarlyStopping
 
 class TransformerTrainer():
@@ -29,6 +31,8 @@ class TransformerTrainer():
         # Define early stopping
         early_stopping = EarlyStopping(patience=patience, delta=delta)
 
+        # Start timer
+        start_time = time.time()
         # Training loop
         for epoch in range(self.epochs):
             self.model.train()
@@ -79,6 +83,12 @@ class TransformerTrainer():
 
             print(f"Epoch {epoch + 1} | Train Loss: {self.train_losses[-1]} | Val Loss: {self.val_losses[-1]}")
             print()
+
+        # Mark the end time
+        end_time = time.time()
+
+        elapsed_time = time.strftime("Hh %Mm %Ss", time.gmtime(end_time - start_time))
+        print(f"Training completed in {elapsed_time}")
 
 
     def evaluate_bleu(self, tgt_vocab, max_len, type: str = "greedy", beam_width: int = None) -> float:
