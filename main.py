@@ -78,6 +78,7 @@ def main():
 
     # MODEL TRAINING
     src_pad_index = eng_vocab["<pad>"]
+    tgt_pad_index = spa_vocab["<pad>"]
     # Define the model
     transformer = Transformer(source_vocab_size=len(eng_vocab),
                               target_vocab_size=len(spa_vocab),
@@ -87,6 +88,7 @@ def main():
                               num_decoder_layers=num_decoder_layers,
                               dropout=dropout,
                               src_pad_index=src_pad_index,
+                              tgt_pad_index=tgt_pad_index,
                               max_len=max_len,
                               device=device).to(device)
     print("Model created")

@@ -11,6 +11,7 @@ class Transformer(nn.Module):
                  num_decoder_layers,
                  dropout,
                  src_pad_index,
+                 tgt_pad_index,
                  max_len,
                  device):
         super(Transformer, self).__init__()
@@ -37,12 +38,18 @@ class Transformer(nn.Module):
 
         # Other attributes for forward pass
         self.src_pad_index = src_pad_index
+        self.tgt_pad_index = tgt_pad_index
         self.device = device
 
-    def make_src_mask(self, src):
+    def make_src_key_padding_mask(self, src):
         # src shape (batch size, src_seq_length)
-        src_mask = src == self.src_pad_index
-        return src_mask
+        mask = src == self.src_pad_index
+        return mask
+    
+    def make_tgt_key_padding_mask(self, tgt):
+        # src shape (batch size, src_seq_length)
+        mask = tgt == self.tgt_pad_index
+        return mask
     
     def forward(self, src, tgt):
         N, src_seq_length = src.shape
@@ -60,7 +67,17 @@ class Transformer(nn.Module):
 
         # So that the transformer knows where the padding is
         src_padding_mask = self.make_src_mask(src)
+        tgt_padding_mask = self.make_tgt_mask(tgt)
         tgt_mask = self.transformer.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
-        output = self.transformer(src_embedded, tgt_embedded, src_key_padding_mask=src_padding_mask, tgt_mask=tgt_mask)
+
+        # Transformer forward pass
+        output = self.transformer(src=src_embedded,
+                                  tgt=tgt_embedded,
+                                  tgt_mask=tgt_mask,
+                                  src_key_padding_mask=src_padding_mask,
+                                  tgt_key_padding_mask=tgt_padding_mask)
+
+        # Fully connected layer
         output = self.fc(output)
+
         return output
