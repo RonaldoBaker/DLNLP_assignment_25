@@ -17,7 +17,7 @@ embedding_size = 512
 num_heads = 8
 num_encoder_layers = 6
 num_decoder_layers = 6
-dropout = 0.1
+dropout = 0.3
 max_len = 100
 batch_size = 64
 epochs = 100
@@ -33,6 +33,12 @@ else:
 print(f"Running on {device}")
 
 def main():
+    # Set random seed for reproducibility
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     # DATA PREPROCESSING
     # Read the text file
     lines = Preprocessor.read_text_file("data/spa-eng/spa.txt")
@@ -88,7 +94,7 @@ def main():
     # Define the loss function, optimiser and scheduler
     loss_func = nn.CrossEntropyLoss(ignore_index=src_pad_index)
     optimiser = optim.Adam(transformer.parameters(), lr=lr)
-    scheduler = ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=3)
+    scheduler = ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=1)
     print("Loss function, optimiser and scheduler defined")
 
     # Define model trainer
@@ -96,15 +102,15 @@ def main():
     print("Model trainer created")
 
     # Train the model
-    # trainer.train()
+    trainer.train(patience=2) # TODO: there seems to be a nested tensor somewhere during training need to debug
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate(tgt_vocab=spa_vocab)
+    trainer.evaluate_bleu_greedy(tgt_vocab=spa_vocab, src_pad_index=src_pad_index, max_len=max_len)
     print("Model evaluated")
 
     # Plot loss curves
-    # trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
 
     # Ablation studies on different combinations of embeddings - subword, word and phrase embeddings
     # Train the model with different combinations of embeddings compared to baseline model with just word embeddings
