@@ -35,9 +35,6 @@ class TransformerTrainer():
             train_loss = 0
 
             for src, tgt in tqdm(self.train_loader, desc="Training Transformer", leave=True, unit="batch"):
-                # Move the source and target tensors to the device
-                src = src.to(self.device)
-                tgt = tgt.to(self.device)
 
                 self.optimiser.zero_grad()
                 output = self.model(src, tgt[:, :-1])
@@ -57,14 +54,12 @@ class TransformerTrainer():
             train_loss /= len(self.train_loader)
             self.train_losses.append(train_loss)
 
-            
+
             with torch.no_grad():
                 self.model.eval()
                 val_loss = 0
 
                 for src, tgt in tqdm(self.val_loader, desc="Validating Transformer", leave=True, unit="batch"):
-                    src = src.to(self.device)
-                    tgt = tgt.to(self.device)
 
                     output = self.model(src, tgt[:, :-1])
                     output = output.reshape(-1, output.shape[-1])
@@ -74,7 +69,7 @@ class TransformerTrainer():
                     val_loss += loss.item()
                 
                 val_loss /= len(self.val_loader)
-                self.scheduler.step(train_loss)
+                self.scheduler.step(val_loss)
                 self.val_losses.append(val_loss)
 
                 early_stopping(self.val_losses[-1])
