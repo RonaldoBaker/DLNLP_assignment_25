@@ -4,9 +4,11 @@ import time
 import matplotlib.pyplot as plt
 import torch
 from torchtext.data.metrics import bleu_score
-from nltk.translate.bleu_score import corpus_bleu
 from torch.nn.utils import clip_grad_norm_
+from torch.nn.functional import log_softmax
+from nltk.translate.bleu_score import corpus_bleu
 from tqdm import tqdm
+import heapq
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -162,70 +164,48 @@ class TransformerTrainer():
                 
                 # If using beam search decoding.
                 elif type == "beam":
-                    # Process each sample in the batch individually.
-                    for i in range(batch_size):
-                        src_i = src[i].unsqueeze(0)  # shape: (1, sequence_length)
-                        # Initialize beam with the start token and zero score.
-                        beam = [([tgt_start_token], 0.0)]
-                        finished_candidates = []
-                        # Beam search decoding loop.
-                        for _ in range(max_len - 1):
+                    # Initialize beams for each batch element
+                    beams = [[(0.0, [tgt_start_token])] for _ in range(batch_size)]
+                    completed_sequences = [[] for _ in range(batch_size)]
+                    
+                    for _ in range(max_len - 1):
+                        for i, beam in enumerate(beams):
                             new_beam = []
-                            for seq, score in beam:
-                                # If the sequence is already finished, keep it.
+                            for score, seq in beam:
                                 if seq[-1] == tgt_end_token:
-                                    finished_candidates.append((seq, score))
+                                    completed_sequences[i].append((score, seq))
                                     continue
-                                # Convert the current sequence to a tensor.
+                                
+                                # Expand the sequence
                                 seq_tensor = torch.tensor(seq, dtype=torch.long, device=self.device).unsqueeze(0)
+                                src_i = src[i].unsqueeze(0)
                                 outputs = self.model(src_i, seq_tensor)  # shape: (1, seq_len, vocab_size)
-                                logits = outputs[:, -1, :]  # get logits at the last time step.
-                                # Compute log probabilities.
-                                log_probs = torch.log_softmax(logits, dim=-1)  # shape: (1, vocab_size)
-
-                                # Get the top beam_width tokens and their log probabilities.
+                                logits = outputs[:, -1, :]
+                                log_probs = log_softmax(logits, dim=-1)
+                                
+                                # Get top beam_width candidates
                                 top_log_probs, top_indices = torch.topk(log_probs, beam_width, dim=-1)
-                                top_log_probs = top_log_probs.squeeze(0)
-                                top_indices = top_indices.squeeze(0)
-            
-                                for log_prob, token_idx in zip(top_log_probs, top_indices):
+                                
+                                for log_prob, token_idx in zip(top_log_probs.squeeze(0), top_indices.squeeze(0)):
                                     new_seq = seq + [token_idx.item()]
                                     new_score = score + log_prob.item()
-                                    new_beam.append((new_seq, new_score))
-                            # If no candidates were expanded, break.
-                            if not new_beam:
-                                break
-                            # Sort candidates by score (highest first) and prune.
-                            new_beam = sorted(new_beam, key=lambda x: x[1], reverse=True)[:beam_width]
-                            beam = new_beam
-                            # If every candidate in the beam has completed the sequence, end early.
-                            if all(seq[-1] == tgt_end_token for seq, _ in beam):
-                                finished_candidates.extend(beam)
-                                break
-                        # Choose the best sequence among finished candidates if available.
-                        if finished_candidates:
-                            best_seq = max(finished_candidates, key=lambda x: x[1])[0]
-                        else:
-                            best_seq = beam[0][0]
-
-                        # Convert token ids (skipping <sos>) into words.
-                        pred_tokens = []
-                        for token_id in best_seq[1:]:
-                            if token_id == tgt_end_token:
-                                break
-                            token = itos[token_id] if token_id < len(itos) else "<unk>"
-                            pred_tokens.append(token)
+                                    heapq.heappush(new_beam, (new_score, new_seq))
+                                    
+                            # Keep only the best beam_width candidates
+                            beams[i] = heapq.nlargest(beam_width, new_beam)
+                            
+                        # If all beams are complete, break early
+                        if all(len(c) > 0 for c in completed_sequences):
+                            break
+                    
+                    # Select best sequences
+                    for i in range(batch_size):
+                        best_seq = max(completed_sequences[i] or beams[i], key=lambda x: x[0])[1]
+                        pred_tokens = [itos[tok] for tok in best_seq[1:] if tok != tgt_end_token]
                         candidates.append(pred_tokens)
-
-                    # Process references for this batch.
-                    for tgt_seq in tgt:
-                        ref_tokens = []
-                        for token_id in tgt_seq[1:]:
-                            if token_id.item() == tgt_end_token:
-                                break
-                            token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
-                            ref_tokens.append(token)
-                        # corpus_bleu expects a list of reference sentences per candidate.
+                        
+                        # Process references
+                        ref_tokens = [itos[tok.item()] for tok in tgt[i, 1:] if tok.item() != tgt_end_token]
                         references.append([ref_tokens])
 
                 else:
