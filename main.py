@@ -20,7 +20,7 @@ num_decoder_layers = 6
 dropout = 0.2
 max_len = 100
 batch_size = 64
-epochs = 100
+epochs = 50
 lr = 0.0001
 
 # Set device
