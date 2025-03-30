@@ -17,7 +17,7 @@ embedding_size = 512
 num_heads = 8
 num_encoder_layers = 6
 num_decoder_layers = 6
-dropout = 0.3
+dropout = 0.2
 max_len = 100
 batch_size = 64
 epochs = 100
@@ -108,7 +108,7 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy")
+    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy", beam_width=None)
     print("Model evaluated")
 
     # Plot loss curves
