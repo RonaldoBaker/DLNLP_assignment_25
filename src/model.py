@@ -66,8 +66,8 @@ class Transformer(nn.Module):
         tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + self.tgt_pos_embedding(tgt_positions))
 
         # So that the transformer knows where the padding is
-        src_padding_mask = self.make_src_mask(src)
-        tgt_padding_mask = self.make_tgt_mask(tgt)
+        src_padding_mask = self.make_src_key_padding_mask(src).to(torch.float32)
+        tgt_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
         tgt_mask = self.transformer.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
 
         # Transformer forward pass
