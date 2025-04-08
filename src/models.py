@@ -81,3 +81,105 @@ class Transformer(nn.Module):
         output = self.fc(output)
 
         return output
+
+
+class MultiSourceTransformer(nn.Module):
+    def __init__(self, vocab_sizes: dict[str, int], embedding_size, nhead, num_encoder_layers, num_decoder_layers, dropout, max_len, device):
+        super(MultiSourceTransformer, self).__init__()
+        self.num_sources = len(vocab_sizes)
+        self.device = device
+
+        # Positional embeddings for source and target
+        self.src_pos_embedding = nn.Embedding(max_len, embedding_size)
+        self.tgt_pos_embedding = nn.Embedding(max_len, embedding_size)
+
+        # Create embeddings and encoders dynamically
+        self.src_embeddings = nn.ModuleDict(
+            {tokenisation: nn.Embedding(vocab_size, embedding_size) for tokenisation, vocab_size in vocab_sizes.items()})
+        self.encoders = nn.ModuleList([
+            nn.TransformerEncoder(
+                nn.TransformerEncoderLayer(d_model=embedding_size, nhead=nhead, dropout=dropout, batch_first=True), num_layers=num_encoder_layers
+            ) for _ in range(self.num_sources)
+        ])
+
+        # Using word-level tokenisation as the output
+        self.tgt_embedding = nn.Embedding(vocab_sizes["tgt_word_ids"], 512)
+        self.decoder = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(d_model=embedding_size, nhead=nhead, dropout=dropout, batch_first=True), num_layers=num_decoder_layers
+        )
+
+        # Output layer
+        self.fc_out = nn.Linear(512, vocab_sizes["tgt_word_ids"])
+
+
+    def cross_attention_fusion(self, tensors: list[torch.tensor], fused_seq_len: int):
+        """
+        Args:
+            tensors: list of Tensors with shape (B, S_i, D)
+            fused_seq_len: number of query tokens to use
+            feature_dim: if not provided, inferred from input
+        Returns:
+            fused tensor: shape (B, N * fused_seq_len, D)
+        """
+        B = tensors[0].shape[0]
+        D = tensors[0].shape[2]
+        N = len(tensors)
+
+        # Create learnable queries (1, fused_seq_len, D)
+        query_tokens = torch.randn(1, fused_seq_len, D, device=tensors[0].device)
+        query_tokens = query_tokens.expand(B, -1, -1)  # (B, fused_seq_len, D)
+
+        fused = []
+
+        for x in tensors:  # x: (B, S, D)
+            # Attention scores: (B, fused_seq_len, S)
+            attn_scores = torch.matmul(query_tokens, x.transpose(1, 2)) / (D ** 0.5)
+            attn_weights = torch.softmax(attn_scores, dim=-1)
+            # Weighted sum: (B, fused_seq_len, D)
+            out = torch.matmul(attn_weights, x)
+            fused.append(out)
+
+        # Concatenate across tensors: (B, N * fused_seq_len, D)
+        return torch.cat(fused, dim=1)
+
+
+    def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
+        # Get positional encodings using the word-level tokenisation
+        src_word_tokenisation = srcs["src_word_ids"]
+        tgt_word_tokenisation = tgt
+
+        N, src_seq_length = src_word_tokenisation.shape
+        N, tgt_seq_length = tgt_word_tokenisation.shape
+
+        src_positions = torch.arange(0, src_seq_length).unsqueeze(0).expand(
+            N, src_seq_length).to(self.device)
+
+        tgt_positions = torch.arange(0, tgt_seq_length).unsqueeze(0).expand(
+            N, tgt_seq_length).to(self.device)
+
+        # Get the embeddings for source tokenisations and target tokenisation
+        src_embeddings = {tokenisation: self.src_embeddings[tokenisation](tensor) for tokenisation, tensor in srcs.items()}
+        tgt_embedding = self.tgt_embedding(tgt_word_tokenisation)
+        src_positional_embedding = self.src_pos_embedding(src_positions) # Positional embeddings
+        tgt_positional_embedding= self.tgt_pos_embedding(tgt_positions)
+
+        # Add positional embeddings to the source and target word embeddings
+        src_embeddings["src_word_ids"] += src_positional_embedding
+        tgt_embedding += tgt_positional_embedding
+
+        # Encoder forward pass
+        encoded_outputs = []
+        for i, (_, tensor) in enumerate(src_embeddings.items()):
+            enc_output = self.encoders[i](tensor)
+            encoded_outputs.append(enc_output)
+
+        # Concatenate the outputs from all sources
+        fused_outputs = self.cross_attention_fusion(encoded_outputs, tgt_seq_length)
+
+        # Decoder forward pass
+        dec_output = self.decoder(tgt_embedding, fused_outputs)
+
+        # Output layer
+        output = self.fc_out(dec_output)
+
+        return output
