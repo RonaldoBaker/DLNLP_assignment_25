@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from src.preprocessor import Preprocessor
 from src.custom_dataset import TranslationDataset, collate_fn
-from models import Transformer
+from src.models import Transformer
 from src.model_trainer import TransformerTrainer
 
 # Define the hyperparameters
