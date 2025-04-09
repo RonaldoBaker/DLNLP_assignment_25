@@ -7,7 +7,7 @@ from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from src.preprocessor import Preprocessor
-from src.custom_dataset import TranslationDataset, collate_fn
+from src.custom_dataset import TokenDataset, collate_fn
 from src.models import Transformer
 from src.model_trainer import TransformerTrainer
 
@@ -60,7 +60,7 @@ def main():
     print("Dataset indexed")
 
     # Create the custom dataset
-    translation_dataset = TranslationDataset(indexed_dataset, eng_vocab, spa_vocab, device)
+    translation_dataset = TokenDataset(indexed_dataset, eng_vocab, spa_vocab, device)
     print("Custom dataset created")
 
     # Split the data into train, validation and test sets

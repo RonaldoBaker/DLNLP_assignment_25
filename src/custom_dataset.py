@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
 
-class TranslationDataset(Dataset):
+class TokenDataset(Dataset):
     """
     A custom dataset class for the translation task.
     """
@@ -35,9 +35,10 @@ class TranslationDataset(Dataset):
         return eng_tensor, spa_tensor
 
 
-class MultiTokenisationDataset(Dataset):
-    def __init__(self, indexed_dataset, device):
+class MultiTokenDataset(Dataset):
+    def __init__(self, indexed_dataset: dict[str, list[str]], chosen_tokenisations: list[str], device: str):
         self.indexed_data = indexed_dataset
+        self.chosen_tokenisations = chosen_tokenisations
         self.device = device
 
     def __len__(self):
@@ -45,8 +46,9 @@ class MultiTokenisationDataset(Dataset):
 
     def __getitem__(self, idx):
         dictionary = self.indexed_data[idx]
+        # Take the tokenisations that are in the chosen tokenisations
         src_dict = {key: torch.tensor(value, dtype=torch.long, device=self.device) for key, value in dictionary.items() 
-                    if key.endswith("_ids") and key.startswith("src_")}
+                    if key in self.chosen_tokenisations}
         tgt_tensor = torch.tensor(dictionary['tgt_word_ids'], dtype=torch.long, device=self.device)
         return src_dict, tgt_tensor
 
