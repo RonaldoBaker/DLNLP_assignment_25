@@ -203,7 +203,7 @@ class Preprocessor:
 
 
     @staticmethod
-    def build_vocab(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
+    def build_vocabularies(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
         """
         Builds the vocabulary for the source and target languages
         from the tokenised data and returns the vocabulary of each language.
@@ -217,18 +217,22 @@ class Preprocessor:
         # Define special tokens
         special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
 
-        eng_tokens = [parallel_dict["src_word_tokens"] for parallel_dict in tokenised_data]
-        spa_tokens = [parallel_dict["tgt_word_tokens"] for parallel_dict in tokenised_data]
+        # Define the name of the vocab object for each tokenisation method
+        token_to_vocab_map = {"src_word_tokens": "src_word_vocab",
+                              "tgt_word_tokens": "tgt_word_vocab",
+                              "src_subword_tokens": "src_subword_vocab",
+                              "src_syllable_tokens": "src_syllable_vocab",
+                              "src_char_tokens": "src_char_vocab"}
 
-        # Build the vocabulary
-        eng_vocab = build_vocab_from_iterator(eng_tokens, specials=special_tokens, min_freq=2)
-        spa_vocab = build_vocab_from_iterator(spa_tokens, specials=special_tokens, min_freq=2)
+        vocabularies = {} # Dictionary to store the vocabularies
 
-        # Set unknown token index as default index
-        eng_vocab.set_default_index(eng_vocab["<unk>"])
-        spa_vocab.set_default_index(spa_vocab["<unk>"])
+        for token_type, vocab_name in token_to_vocab_map.items():
+            tokens = (parallel_dict[token_type] for parallel_dict in tokenised_data)
+            vocab = build_vocab_from_iterator(tokens, specials=special_tokens, min_freq=2)
+            vocab.set_default_index(vocab["<unk>"])
+            vocabularies[vocab_name] = vocab
 
-        return eng_vocab, spa_vocab
+        return vocabularies
 
 
     @staticmethod

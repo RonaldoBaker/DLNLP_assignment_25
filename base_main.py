@@ -52,7 +52,7 @@ def main():
     print("Dataset tokenised")
 
     # Create vocabulary
-    eng_vocab, spa_vocab = Preprocessor.build_vocab(tokenised_dataset)
+    eng_vocab, spa_vocab = Preprocessor.build_vocabularies(tokenised_dataset)
     print("Vocabulary built")
 
     # Convert the tokenised data to indices
