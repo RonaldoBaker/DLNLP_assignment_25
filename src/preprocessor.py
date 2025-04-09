@@ -119,7 +119,7 @@ class Preprocessor:
                       sos_token: str,
                       eos_token: str,
                       max_length: int = 100
-                      ) -> dict[str, str]:
+                      ) -> dict[str, list[str]]:
         """
         Tokenises the sentences in the given pair of parallel sentences
         and returns the tokenised sentences as a dictionary.
@@ -203,7 +203,7 @@ class Preprocessor:
 
 
     @staticmethod
-    def build_vocabularies(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
+    def build_vocabularies(tokenised_data: list[dict[str, str]]) -> dict[str, Vocab]:
         """
         Builds the vocabulary for the source and target languages
         from the tokenised data and returns the vocabulary of each language.
