@@ -10,6 +10,13 @@ import spacy
 import torchtext
 torchtext.disable_torchtext_deprecation_warning()
 from torchtext.vocab import Vocab, build_vocab_from_iterator  # noqa: E402
+from transformers import T5Tokenizer
+import nltk
+nltk.download("punkt_tab")
+nltk.download("words")
+from nltk.tokenize.legality_principle import LegalitySyllableTokenizer
+from nltk.tokenize.simple import CharTokenizer
+from nltk.corpus import words
 
 class Preprocessor:
     """
@@ -108,8 +115,7 @@ class Preprocessor:
 
     @staticmethod
     def __create_tokens(pair: dict[str, str],
-                      eng_tokeniser: spacy.language.Language,
-                      spa_tokeniser: spacy.language.Language,
+                      tokenisers: dict,
                       sos_token: str,
                       eos_token: str,
                       max_length: int = 100
@@ -129,17 +135,39 @@ class Preprocessor:
         Returns:
             - (dict[str, str]): The tokenised sentences as a dictionary
         """
-        # Tokenise the text
-        eng_tokens = [token.text for token in eng_tokeniser.tokenizer(pair["src"])][:max_length]
-        spa_tokens = [token.text for token in spa_tokeniser.tokenizer(pair["tgt"])][:max_length]
+        # Tokenise the text using the tokenisers from the dictionary
+        # Word tokenisation
+        src_word_tokens = [token.text for token in tokenisers["src_word_tokeniser"].tokenizer(pair["src"])][:max_length]
+        tgt_word_tokens = [token.text for token in tokenisers["tgt_word_tokeniser"].tokenizer(pair["tgt"])][:max_length]
+
+        # Subword tokenisation
+        src_subword_tokens = tokenisers["src_subword_tokeniser"].tokenize(pair["src"])
+        # Occassionally appends an underscore to the beginning of the token so remove that
+        src_subword_tokens = [token[1:] if token.startswith("▁") else token for token in src_subword_tokens][:max_length]
+
+        # Syllable tokenisation
+        src_syllable_tokens = [tokenisers["src_syllable_tokeniser"].tokenize(word_token) for word_token in src_word_tokens]
+        # Returns a list of lists so convert to one list
+        src_syllable_tokens = [item for sublist in src_syllable_tokens for item in sublist][:max_length]
+
+        # Character tokenisation
+        src_char_tokens = tokenisers["src_char_tokeniser"].tokenize(pair["src"])[:max_length]
 
         # Add the start of sentence and end of sentence tokens
-        eng_tokens = [sos_token] + eng_tokens + [eos_token]
-        spa_tokens = [sos_token] + spa_tokens + [eos_token]
+        tokenisations = {
+            "src_word_tokens": src_word_tokens,
+            "tgt_word_tokens": tgt_word_tokens,
+            "src_subword_tokens": src_subword_tokens,
+            "src_syllable_tokens": src_syllable_tokens,
+            "src_char_tokens": src_char_tokens
+            }
 
-        pair.update({"src_word_tokens": eng_tokens, "tgt_word_tokens": spa_tokens})
+        for key in tokenisations.keys():
+            tokenisations[key] = [sos_token] + tokenisations[key] + [eos_token]
+
+        pair.update(tokenisations)
         return pair
-    
+
 
     @staticmethod
     def create_tokenised_dataset(translation_dictionary: dict[str, str]) -> list[dict[str, str]]:
@@ -153,12 +181,26 @@ class Preprocessor:
         Returns:
             - (list[dict[str, str]]): The tokenised parallel sentences as a list of dictionaries
         """
-         # Create spacy tokenisers
-        spa_tokeniser = spacy.load("es_core_news_sm")
-        eng_tokeniser = spacy.load("en_core_web_sm")
+         # Create spacy tokenisers for word tokenisation
+        src_word_tokeniser = spacy.load("es_core_news_sm")
+        tgt_word_tokeniser = spacy.load("en_core_web_sm")
 
-        return list(map(lambda x: Preprocessor.__create_tokens(x, eng_tokeniser, spa_tokeniser, sos_token="<sos>", eos_token="<eos>"),translation_dictionary))
-        
+        # Create pretrained huggingface tokeniser for subword tokenisation
+        src_subword_tokeniser = T5Tokenizer.from_pretrained("t5-base", legacy=False)
+
+        # Create nltk tokenisers for syllable and character tokenization
+        src_syllable_tokeniser = LegalitySyllableTokenizer(words.words())
+        src_char_tokeniser = CharTokenizer()
+
+        tokenisers = {"src_word_tokeniser": src_word_tokeniser,
+                      "tgt_word_tokeniser": tgt_word_tokeniser,
+                      "src_subword_tokeniser": src_subword_tokeniser,
+                      "src_syllable_tokeniser": src_syllable_tokeniser,
+                      "src_char_tokeniser": src_char_tokeniser
+                      }
+
+        return list(map(lambda x: Preprocessor.__create_tokens(x, tokenisers, sos_token="<sos>", eos_token="<eos>"), translation_dictionary))
+
 
     @staticmethod
     def build_vocab(tokenised_data: list[dict[str, str]]) -> tuple[Vocab, Vocab]:
