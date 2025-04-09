@@ -22,6 +22,16 @@ class Preprocessor:
     """
     The Preprocessor class contains various methods for preprocessing text data.
     """
+    # Tokenisation method to vocabulary name mapping
+    # when building the vocabulary and changing tokens into integers
+    token_to_vocab_map = {
+        "src_word_tokens": "src_word_vocab",
+        "tgt_word_tokens": "tgt_word_vocab",
+        "src_subword_tokens": "src_subword_vocab",
+        "src_syllable_tokens": "src_syllable_vocab",
+        "src_char_tokens": "src_char_vocab"
+    }
+
     @staticmethod
     def read_text_file(path: str) -> list[str]:
         """
@@ -217,16 +227,9 @@ class Preprocessor:
         # Define special tokens
         special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
 
-        # Define the name of the vocab object for each tokenisation method
-        token_to_vocab_map = {"src_word_tokens": "src_word_vocab",
-                              "tgt_word_tokens": "tgt_word_vocab",
-                              "src_subword_tokens": "src_subword_vocab",
-                              "src_syllable_tokens": "src_syllable_vocab",
-                              "src_char_tokens": "src_char_vocab"}
-
         vocabularies = {} # Dictionary to store the vocabularies
 
-        for token_type, vocab_name in token_to_vocab_map.items():
+        for token_type, vocab_name in Preprocessor.token_to_vocab_map.items():
             tokens = (parallel_dict[token_type] for parallel_dict in tokenised_data)
             vocab = build_vocab_from_iterator(tokens, specials=special_tokens, min_freq=2)
             vocab.set_default_index(vocab["<unk>"])
