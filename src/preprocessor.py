@@ -70,7 +70,7 @@ class Preprocessor:
 
             # Add the sentences to the dictionary
             if format == "dict":
-                translations.append({"eng": eng_sentence, "spa": spa_sentence})
+                translations.append({"src": eng_sentence, "tgt": spa_sentence})
             elif format == "tuple":
                 translations.append((eng_sentence, spa_sentence))
 
@@ -130,14 +130,14 @@ class Preprocessor:
             - (dict[str, str]): The tokenised sentences as a dictionary
         """
         # Tokenise the text
-        eng_tokens = [token.text for token in eng_tokeniser.tokenizer(pair["eng"])][:max_length]
-        spa_tokens = [token.text for token in spa_tokeniser.tokenizer(pair["spa"])][:max_length]
+        eng_tokens = [token.text for token in eng_tokeniser.tokenizer(pair["src"])][:max_length]
+        spa_tokens = [token.text for token in spa_tokeniser.tokenizer(pair["tgt"])][:max_length]
 
         # Add the start of sentence and end of sentence tokens
         eng_tokens = [sos_token] + eng_tokens + [eos_token]
         spa_tokens = [sos_token] + spa_tokens + [eos_token]
 
-        pair.update({"eng_tokens": eng_tokens, "spa_tokens": spa_tokens})
+        pair.update({"src_word_tokens": eng_tokens, "tgt_word_tokens": spa_tokens})
         return pair
     
 
@@ -175,8 +175,8 @@ class Preprocessor:
         # Define special tokens
         special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
 
-        eng_tokens = [parallel_dict["eng_tokens"] for parallel_dict in tokenised_data]
-        spa_tokens = [parallel_dict["spa_tokens"] for parallel_dict in tokenised_data]
+        eng_tokens = [parallel_dict["src_word_tokens"] for parallel_dict in tokenised_data]
+        spa_tokens = [parallel_dict["tgt_word_tokens"] for parallel_dict in tokenised_data]
 
         # Build the vocabulary
         eng_vocab = build_vocab_from_iterator(eng_tokens, specials=special_tokens, min_freq=2)
@@ -203,11 +203,11 @@ class Preprocessor:
             - (dict[str, str]): The uypdated dictionary containing the indices
         """
         # Use in-built numericalization methods to convert tokens to indices
-        eng_ids = eng_vocab.lookup_indices(data["eng_tokens"])
-        spa_ids = spa_vocab.lookup_indices(data["spa_tokens"])
+        eng_ids = eng_vocab.lookup_indices(data["src_word_tokens"])
+        spa_ids = spa_vocab.lookup_indices(data["tgt_word_tokens"])
 
         # Update the dictionary with the indices
-        data.update({"eng_ids": eng_ids, "spa_ids": spa_ids})
+        data.update({"src_word_ids": eng_ids, "tgt_word_ids": spa_ids})
 
         return data
 

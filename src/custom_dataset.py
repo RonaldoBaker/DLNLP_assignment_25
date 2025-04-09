@@ -30,8 +30,8 @@ class TranslationDataset(Dataset):
         Returns the indexed source and target sentences at the given index.
         """
         dictionary = self.indexed_dataset[idx]
-        eng_tensor = torch.tensor(dictionary['eng_ids'], dtype=torch.long, device=self.device)
-        spa_tensor = torch.tensor(dictionary['spa_ids'], dtype=torch.long, device=self.device)
+        eng_tensor = torch.tensor(dictionary['src_word_ids'], dtype=torch.long, device=self.device)
+        spa_tensor = torch.tensor(dictionary['tgt_word_ids'], dtype=torch.long, device=self.device)
         return eng_tensor, spa_tensor
 
 
