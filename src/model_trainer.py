@@ -124,7 +124,7 @@ class TransformerTrainer():
         with torch.no_grad():
             # Iterate over the test set batches
             for src, tgt in tqdm(self.test_loader, desc="Testing Transformer", leave=True, unit="batch"):
-                batch_size = src.size(0)
+                batch_size = tgt.size(0)
 
                 # If using greedy decoding.
                 if type == "greedy":
