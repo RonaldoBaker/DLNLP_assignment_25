@@ -84,10 +84,11 @@ class Transformer(nn.Module):
 
 
 class MultiSourceTransformer(nn.Module):
-    def __init__(self, vocab_sizes: dict[str, int], embedding_size, nhead, num_encoder_layers, num_decoder_layers, dropout, max_len, device):
+    def __init__(self, vocab_sizes: dict[str, int], embedding_size, nhead, num_encoder_layers, num_decoder_layers, dropout, max_len, device, pad_index):
         super(MultiSourceTransformer, self).__init__()
         self.num_sources = len(vocab_sizes)
         self.device = device
+        self.pad_index = pad_index
 
         # Positional embeddings for source and target
         self.src_pos_embedding = nn.Embedding(max_len, embedding_size)
@@ -143,6 +144,33 @@ class MultiSourceTransformer(nn.Module):
         return torch.cat(fused, dim=1)
 
 
+    def make_src_key_padding_mask(self, srcs: dict[str, torch.Tensor]):
+        # src shape (batch size, src_seq_length)
+        masks = {}
+        for tokenisation, tensor in srcs.items():
+            mask = tensor == self.pad_index
+            masks[tokenisation] = mask
+        return masks
+
+
+    def make_tgt_key_padding_mask(self, tgt):
+        # tgt shape (batch size, tgt_seq_length)
+        mask = tgt == self.pad_index
+        return mask
+
+
+    def generate_square_subsequent_mask(self, size: int) -> torch.Tensor:
+        """
+        Generate a square subsequent mask for the decoder.
+        Args:
+            size: The size of the mask.
+        Returns:
+            A square subsequent mask.
+        """
+        mask = torch.triu(torch.full((size, size), float("-inf")), diagonal=1).float()
+        return mask
+
+
     def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
         # Get positional encodings using the word-level tokenisation
         src_word_tokenisation = srcs["src_word_ids"]
@@ -167,17 +195,25 @@ class MultiSourceTransformer(nn.Module):
         src_embeddings["src_word_ids"] += src_positional_embedding
         tgt_embedding += tgt_positional_embedding
 
+        # Make source key padding masks
+        src_key_padding_masks = self.make_src_key_padding_mask(srcs)
+
         # Encoder forward pass
         encoded_outputs = []
-        for i, (_, tensor) in enumerate(src_embeddings.items()):
-            enc_output = self.encoders[i](tensor)
+        for i, (tokenisation, tensor) in enumerate(src_embeddings.items()):
+            enc_output = self.encoders[i](src=tensor, src_key_padding_mask=src_key_padding_masks[tokenisation])
             encoded_outputs.append(enc_output)
 
         # Concatenate the outputs from all sources
         fused_outputs = self.cross_attention_fusion(encoded_outputs, tgt_seq_length)
 
         # Decoder forward pass
-        dec_output = self.decoder(tgt_embedding, fused_outputs)
+        tgt_key_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
+        tgt_mask = self.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
+        dec_output = self.decoder(tgt=tgt_embedding,
+                                  memory=fused_outputs,
+                                  tgt_mask=tgt_mask,
+                                  tgt_key_padding_mask=tgt_key_padding_mask)
 
         # Output layer
         output = self.fc_out(dec_output)
