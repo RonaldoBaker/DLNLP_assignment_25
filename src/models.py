@@ -1,3 +1,4 @@
+from typing import Union
 import torch 
 import torch.nn as nn
 
@@ -83,12 +84,52 @@ class Transformer(nn.Module):
         return output
 
 
+class AttentionFusion(nn.Module):
+    def __init__(self, embedding_size: int, num_heads: int, layer_names: list[str]):
+        super(AttentionFusion, self).__init__()
+        self.single_attention_layer = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=num_heads, batch_first=True)
+
+        self.multi_attention_layers = nn.ModuleDict({
+            name: nn.MultiheadAttention(embed_dim=embedding_size, num_heads=num_heads, batch_first=True)
+             for name in layer_names})
+
+    def forward(self, srcs: dict[str, torch.tensor], type: str = "single"):
+        attention_outputs = [] # Empty list to store attention outputs
+        if type == "single":
+            # Calculate attention between the base tokenisation and the other tokenisations
+            for _, encoded_output in srcs.items():
+                attention_output, _ = self.single_attention_layer(query=srcs["src_word_ids"], key=encoded_output, value=encoded_output)
+                attention_outputs.append(attention_output)
+
+        elif type == "multi":
+            for tokenisation in self.multi_attention_layers.keys():
+                attention_output, _ = self.multi_attention_layers[tokenisation](query=srcs["src_word_ids"], key=srcs[tokenisation], value=srcs[tokenisation])
+                attention_outputs.append(attention_output)
+
+        else:
+            raise ValueError("Invalid attention type. Choose 'single' or 'multi'.")
+        
+        # Sum the attention outputs
+        fused_output = sum(attention_outputs) # (B, S_l, D)
+        return fused_output
+
+
 class MultiSourceTransformer(nn.Module):
-    def __init__(self, vocab_sizes: dict[str, int], embedding_size, nhead, num_encoder_layers, num_decoder_layers, dropout, max_len, device, pad_index):
+    def __init__(self, vocab_sizes: dict[str, int],
+                 embedding_size,
+                 nhead,
+                 num_encoder_layers,
+                 num_decoder_layers,
+                 dropout,
+                 max_len,
+                 device,
+                 pad_index,
+                 fusion_type):
         super(MultiSourceTransformer, self).__init__()
         self.num_sources = len(vocab_sizes)
         self.device = device
         self.pad_index = pad_index
+        self.fusion_type = fusion_type
 
         # Positional embeddings for source and target
         self.src_pos_embedding = nn.Embedding(max_len, embedding_size)
@@ -104,7 +145,7 @@ class MultiSourceTransformer(nn.Module):
         ])
 
         # Using word-level tokenisation as the output
-        self.tgt_embedding = nn.Embedding(vocab_sizes["tgt_word_ids"], 512)
+        self.tgt_embedding = nn.Embedding(vocab_sizes["tgt_word_ids"], embedding_size)
         self.decoder = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(d_model=embedding_size, nhead=nhead, dropout=dropout, batch_first=True), num_layers=num_decoder_layers
         )
@@ -112,38 +153,14 @@ class MultiSourceTransformer(nn.Module):
         # Output layer
         self.fc_out = nn.Linear(512, vocab_sizes["tgt_word_ids"])
 
+        # Dropout layer
+        self.dropout = nn.Dropout(dropout)
 
-    def cross_attention_fusion(self, tensors: list[torch.tensor], fused_seq_len: int):
-        """
-        Args:
-            tensors: list of Tensors with shape (B, S_i, D)
-            fused_seq_len: number of query tokens to use
-            feature_dim: if not provided, inferred from input
-        Returns:
-            fused tensor: shape (B, N * fused_seq_len, D)
-        """
-        B = tensors[0].shape[0]
-        D = tensors[0].shape[2]
-        N = len(tensors)
+        # Create the attention fusion layer
+        layer_names = [name for name in vocab_sizes.keys() if name != "src_word_ids" and name != "tgt_word_ids"]
+        self.fuser = AttentionFusion(embedding_size, nhead, layer_names)
 
-        # Create learnable queries (1, fused_seq_len, D)
-        query_tokens = torch.randn(1, fused_seq_len, D, device=tensors[0].device)
-        query_tokens = query_tokens.expand(B, -1, -1)  # (B, fused_seq_len, D)
-
-        fused = []
-
-        for x in tensors:  # x: (B, S, D)
-            # Attention scores: (B, fused_seq_len, S)
-            attn_scores = torch.matmul(query_tokens, x.transpose(1, 2)) / (D ** 0.5)
-            attn_weights = torch.softmax(attn_scores, dim=-1)
-            # Weighted sum: (B, fused_seq_len, D)
-            out = torch.matmul(attn_weights, x)
-            fused.append(out)
-
-        # Concatenate across tensors: (B, N * fused_seq_len, D)
-        return torch.cat(fused, dim=1)
-
-
+       
     def make_src_key_padding_mask(self, srcs: dict[str, torch.Tensor]):
         # src shape (batch size, src_seq_length)
         masks = {}
@@ -171,47 +188,66 @@ class MultiSourceTransformer(nn.Module):
         return mask
 
 
-    def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
+    def get_positional_word_embeddings(self, src: Union[dict, torch.Tensor], tgt: torch.Tensor):
+        """
+        Get positional word embeddings for source and target sequences.
+        Args:
+            src: Source sequence (dict of different source tokenisations or tensor).
+            tgt: Target sequence (tensor).
+        Returns:
+            src_embeddings: Source embeddings with positional information from word tokenisations.
+            tgt_embeddings: Target embeddings with positional information from word tokenisations.
+        """
+        if isinstance(src, dict):
+            src = src["src_word_ids"]
+
+        N, src_seq_length = src.shape # batch size, source sequence length
+        N, tgt_seq_length = tgt.shape # batch size, target sequence length
+
         # Get positional encodings using the word-level tokenisation
-        src_word_tokenisation = srcs["src_word_ids"]
-        tgt_word_tokenisation = tgt
-
-        N, src_seq_length = src_word_tokenisation.shape
-        N, tgt_seq_length = tgt_word_tokenisation.shape
-
         src_positions = torch.arange(0, src_seq_length).unsqueeze(0).expand(
             N, src_seq_length).to(self.device)
 
         tgt_positions = torch.arange(0, tgt_seq_length).unsqueeze(0).expand(
             N, tgt_seq_length).to(self.device)
 
+        # Positional embeddings
+        src_positional_embedding = self.src_pos_embedding(src_positions)
+        tgt_positional_embedding = self.tgt_pos_embedding(tgt_positions)
+        
+        return src_positional_embedding, tgt_positional_embedding
+
+
+    def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
+        # # Get positional encodings using the word-level tokenisation
+        src_positional_embedding, tgt_positional_embedding = self.get_positional_word_embeddings(srcs, tgt)
+
         # Get the embeddings for source tokenisations and target tokenisation
         src_embeddings = {tokenisation: self.src_embeddings[tokenisation](tensor) for tokenisation, tensor in srcs.items()}
-        tgt_embedding = self.tgt_embedding(tgt_word_tokenisation)
-        src_positional_embedding = self.src_pos_embedding(src_positions) # Positional embeddings
-        tgt_positional_embedding= self.tgt_pos_embedding(tgt_positions)
+        tgt_embedding = self.tgt_embedding(tgt)
 
         # Add positional embeddings to the source and target word embeddings
-        src_embeddings["src_word_ids"] += src_positional_embedding
-        tgt_embedding += tgt_positional_embedding
+        src_embeddings["src_word_ids"] = self.dropout(src_embeddings["src_word_ids"] + src_positional_embedding)
+        tgt_embedding = self.dropout(tgt_embedding + tgt_positional_embedding)
 
         # Make source key padding masks
         src_key_padding_masks = self.make_src_key_padding_mask(srcs)
 
         # Encoder forward pass
-        encoded_outputs = []
+        encoded_outputs = {}
         for i, (tokenisation, tensor) in enumerate(src_embeddings.items()):
             enc_output = self.encoders[i](src=tensor, src_key_padding_mask=src_key_padding_masks[tokenisation])
-            encoded_outputs.append(enc_output)
+            encoded_outputs[tokenisation] = enc_output
 
-        # Concatenate the outputs from all sources
-        fused_outputs = self.cross_attention_fusion(encoded_outputs, tgt_seq_length)
+        # Attention-based fusion if there is more than one tokenisation method,
+        # if not return the regular encoder output for word tokenisation
+        fused_output = encoded_outputs["src_word_ids"] if len(encoded_outputs) == 1 else self.fuser(encoded_outputs, self.fusion_type)
 
         # Decoder forward pass
         tgt_key_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
-        tgt_mask = self.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
+        tgt_mask = self.generate_square_subsequent_mask(tgt.shape[1]).to(self.device)
         dec_output = self.decoder(tgt=tgt_embedding,
-                                  memory=fused_outputs,
+                                  memory=fused_output,
                                   tgt_mask=tgt_mask,
                                   tgt_key_padding_mask=tgt_key_padding_mask)
 
