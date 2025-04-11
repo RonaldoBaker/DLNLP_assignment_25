@@ -58,18 +58,18 @@ class BaseTransformer(nn.Module):
             masks = {}
             for tokenisation, tensor in src.items():
                 mask = tensor == self.pad_index
-                masks[tokenisation] = mask
+                masks[tokenisation] = mask.to(torch.float32)
             return masks
         else:
             # src shape (batch size, src_seq_length)
             mask = src == self.pad_index
-            return mask
+            return mask.to(torch.float32)
 
 
     def make_tgt_key_padding_mask(self, tgt):
         # tgt shape (batch size, tgt_seq_length)
         mask = tgt == self.pad_index
-        return mask
+        return mask.to(torch.float32)
 
 
 class Transformer(BaseTransformer):
@@ -119,9 +119,9 @@ class Transformer(BaseTransformer):
         tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + tgt_positional_embedding)
 
         # So that the transformer knows where the padding is
-        src_padding_mask = self.make_src_key_padding_mask(src).to(torch.float32)
-        tgt_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
-        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device)
+        src_padding_mask = self.make_src_key_padding_mask(src)
+        tgt_padding_mask = self.make_tgt_key_padding_mask(tgt)
+        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1], device=self.device, dtype=torch.float32)
 
         # Transformer forward pass
         output = self.transformer(src=src_embedded,
@@ -202,7 +202,7 @@ class MultiSourceTransformer(BaseTransformer):
         )
 
         # Output layer
-        self.fc_out = nn.Linear(512, self.vocab_sizes["tgt_word_ids"])
+        self.fc_out = nn.Linear(self.embedding_size, self.vocab_sizes["tgt_word_ids"])
 
         # Dropout layer
         self.dropout = nn.Dropout(self.dropout)
@@ -250,7 +250,7 @@ class MultiSourceTransformer(BaseTransformer):
         fused_output = encoded_outputs["src_word_ids"] if len(encoded_outputs) == 1 else self.fuser(encoded_outputs, self.fusion_type)
 
         # Decoder forward pass
-        tgt_key_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
+        tgt_key_padding_mask = self.make_tgt_key_padding_mask(tgt)
         tgt_mask = self.generate_square_subsequent_mask(tgt.shape[1]).to(self.device)
         dec_output = self.decoder(tgt=tgt_embedding,
                                   memory=fused_output,
