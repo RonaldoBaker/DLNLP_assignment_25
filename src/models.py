@@ -166,21 +166,20 @@ class AttentionFusion(nn.Module):
         return fused_output
 
 
-class MultiSourceTransformer(nn.Module):
+class MultiSourceTransformer(BaseTransformer):
     def __init__(self, vocab_sizes: dict[str, int],
-                 embedding_size,
-                 nhead,
-                 num_encoder_layers,
-                 num_decoder_layers,
-                 dropout,
-                 max_len,
-                 device,
-                 pad_index,
-                 fusion_type):
-        super(MultiSourceTransformer, self).__init__()
+                 embedding_size: int,
+                 num_heads: int,
+                 num_encoder_layers: int,
+                 num_decoder_layers: int,
+                 dropout: float,
+                 pad_index: int,
+                 max_len: int,
+                 device: str,
+                 fusion_type: str):
+        super().__init__(embedding_size, num_heads, num_encoder_layers, num_decoder_layers, dropout, pad_index, max_len, device)
+        self.vocab_sizes = vocab_sizes
         self.num_sources = len(vocab_sizes)
-        self.device = device
-        self.pad_index = pad_index
         self.fusion_type = fusion_type
 
         # Positional embeddings for source and target
@@ -189,43 +188,28 @@ class MultiSourceTransformer(nn.Module):
 
         # Create embeddings and encoders dynamically
         self.src_embeddings = nn.ModuleDict(
-            {tokenisation: nn.Embedding(vocab_size, embedding_size) for tokenisation, vocab_size in vocab_sizes.items()})
+            {tokenisation: nn.Embedding(vocab_size, self.embedding_size) for tokenisation, vocab_size in self.vocab_sizes.items()})
         self.encoders = nn.ModuleList([
             nn.TransformerEncoder(
-                nn.TransformerEncoderLayer(d_model=embedding_size, nhead=nhead, dropout=dropout, batch_first=True), num_layers=num_encoder_layers
+                nn.TransformerEncoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_encoder_layers
             ) for _ in range(self.num_sources)
         ])
 
         # Using word-level tokenisation as the output
-        self.tgt_embedding = nn.Embedding(vocab_sizes["tgt_word_ids"], embedding_size)
+        self.tgt_embedding = nn.Embedding(self.vocab_sizes["tgt_word_ids"], self.embedding_size)
         self.decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(d_model=embedding_size, nhead=nhead, dropout=dropout, batch_first=True), num_layers=num_decoder_layers
+            nn.TransformerDecoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_decoder_layers
         )
 
         # Output layer
-        self.fc_out = nn.Linear(512, vocab_sizes["tgt_word_ids"])
+        self.fc_out = nn.Linear(512, self.vocab_sizes["tgt_word_ids"])
 
         # Dropout layer
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(self.dropout)
 
         # Create the attention fusion layer
-        layer_names = [name for name in vocab_sizes.keys() if name != "src_word_ids" and name != "tgt_word_ids"]
-        self.fuser = AttentionFusion(embedding_size, nhead, layer_names)
-
-       
-    def make_src_key_padding_mask(self, srcs: dict[str, torch.Tensor]):
-        # src shape (batch size, src_seq_length)
-        masks = {}
-        for tokenisation, tensor in srcs.items():
-            mask = tensor == self.pad_index
-            masks[tokenisation] = mask
-        return masks
-
-
-    def make_tgt_key_padding_mask(self, tgt):
-        # tgt shape (batch size, tgt_seq_length)
-        mask = tgt == self.pad_index
-        return mask
+        layer_names = [name for name in self.vocab_sizes.keys() if name != "src_word_ids" and name != "tgt_word_ids"]
+        self.fuser = AttentionFusion(embedding_size, self.num_heads, layer_names)
 
 
     def generate_square_subsequent_mask(self, size: int) -> torch.Tensor:
@@ -238,36 +222,6 @@ class MultiSourceTransformer(nn.Module):
         """
         mask = torch.triu(torch.full((size, size), float("-inf")), diagonal=1).float()
         return mask
-
-
-    def get_positional_word_embeddings(self, src: Union[dict, torch.Tensor], tgt: torch.Tensor):
-        """
-        Get positional word embeddings for source and target sequences.
-        Args:
-            src: Source sequence (dict of different source tokenisations or tensor).
-            tgt: Target sequence (tensor).
-        Returns:
-            src_embeddings: Source embeddings with positional information from word tokenisations.
-            tgt_embeddings: Target embeddings with positional information from word tokenisations.
-        """
-        if isinstance(src, dict):
-            src = src["src_word_ids"]
-
-        N, src_seq_length = src.shape # batch size, source sequence length
-        N, tgt_seq_length = tgt.shape # batch size, target sequence length
-
-        # Get positional encodings using the word-level tokenisation
-        src_positions = torch.arange(0, src_seq_length).unsqueeze(0).expand(
-            N, src_seq_length).to(self.device)
-
-        tgt_positions = torch.arange(0, tgt_seq_length).unsqueeze(0).expand(
-            N, tgt_seq_length).to(self.device)
-
-        # Positional embeddings
-        src_positional_embedding = self.src_pos_embedding(src_positions)
-        tgt_positional_embedding = self.tgt_pos_embedding(tgt_positions)
-        
-        return src_positional_embedding, tgt_positional_embedding
 
 
     def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
