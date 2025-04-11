@@ -23,6 +23,8 @@ batch_size = 64
 epochs = 50
 lr = 0.0001
 
+# /home/zceerba/.conda/envs/nlp/bin/python
+
 # Set device
 if torch.cuda.is_available():
     device_num = 1
@@ -113,13 +115,6 @@ def main():
 
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
-
-    # Ablation studies on different combinations of embeddings - subword, word and phrase embeddings
-    # Train the model with different combinations of embeddings compared to baseline model with just word embeddings
-    # Evaluate the model
-    # Compare the results
-
-    pass
 
 if __name__ == '__main__':
     main()
