@@ -2,74 +2,126 @@ from typing import Union
 import torch 
 import torch.nn as nn
 
-class Transformer(nn.Module):
+class BaseTransformer(nn.Module):
     def __init__(self,
-                 source_vocab_size,
-                 target_vocab_size,
-                 embedding_size,
-                 nhead,
-                 num_encoder_layers,
-                 num_decoder_layers,
-                 dropout,
-                 src_pad_index,
-                 tgt_pad_index,
-                 max_len,
-                 device):
-        super(Transformer, self).__init__()
-        # Word enbeddings for source and target
-        self.src_word_embedding = nn.Embedding(source_vocab_size, embedding_size)
-        self.tgt_word_embedding = nn.Embedding(target_vocab_size, embedding_size)
-
-        # Positional embeddings for source and target
-        self.src_pos_embedding = nn.Embedding(max_len, embedding_size)
-        self.tgt_pos_embedding = nn.Embedding(max_len, embedding_size)
-
-        # Transformer model
-        self.transformer = nn.Transformer(d_model=embedding_size,
-                                          nhead=nhead,
-                                          num_encoder_layers=num_encoder_layers,
-                                          num_decoder_layers=num_decoder_layers,
-                                          dropout=dropout,
-                                          activation='relu',
-                                          batch_first=True)
-        
-        # Fully connected layer
-        self.fc = nn.Linear(embedding_size, target_vocab_size)
-        self.dropout = nn.Dropout(dropout)
-
-        # Other attributes for forward pass
-        self.src_pad_index = src_pad_index
-        self.tgt_pad_index = tgt_pad_index
+                 embedding_size: int,
+                 num_heads: int,
+                 num_encoder_layers: int,
+                 num_decoder_layers: int,
+                 dropout: float,
+                 pad_index: int,
+                 max_len: int,
+                 device: str):
+        super().__init__()
+        self.embedding_size = embedding_size
+        self.num_heads = num_heads
+        self.num_encoder_layers = num_encoder_layers
+        self.num_decoder_layers = num_decoder_layers
+        self.dropout = dropout
+        self.pad_index = pad_index
+        self.max_len = max_len
         self.device = device
 
-    def make_src_key_padding_mask(self, src):
-        # src shape (batch size, src_seq_length)
-        mask = src == self.src_pad_index
-        return mask
-    
-    def make_tgt_key_padding_mask(self, tgt):
-        # src shape (batch size, src_seq_length)
-        mask = tgt == self.tgt_pad_index
-        return mask
-    
-    def forward(self, src, tgt):
-        N, src_seq_length = src.shape
-        N, tgt_seq_length = tgt.shape
 
-        # Positional encodings
+    def get_positional_word_embeddings(self, src: Union[dict, torch.Tensor], tgt: torch.Tensor):
+        """
+        Get positional word embeddings for source and target sequences.
+        Args:
+            src: Source sequence (dict of different source tokenisations or tensor).
+            tgt: Target sequence (tensor).
+        Returns:
+            src_embeddings: Source embeddings with positional information from word tokenisations.
+            tgt_embeddings: Target embeddings with positional information from word tokenisations.
+        """
+        if isinstance(src, dict):
+            src = src["src_word_ids"]
+
+        N, src_seq_length = src.shape # batch size, source sequence length
+        N, tgt_seq_length = tgt.shape # batch size, target sequence length
+
+        # Get positional encodings using the word-level tokenisation
         src_positions = torch.arange(0, src_seq_length).unsqueeze(0).expand(
             N, src_seq_length).to(self.device)
-        
+
         tgt_positions = torch.arange(0, tgt_seq_length).unsqueeze(0).expand(
             N, tgt_seq_length).to(self.device)
 
-        src_embedded = self.dropout(self.src_word_embedding(src) + self.src_pos_embedding(src_positions))
-        tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + self.tgt_pos_embedding(tgt_positions))
+        # Positional embeddings
+        src_positional_embedding = self.src_pos_embedding(src_positions)
+        tgt_positional_embedding = self.tgt_pos_embedding(tgt_positions)
+
+        return src_positional_embedding, tgt_positional_embedding
+
+
+    def make_src_key_padding_mask(self, src: Union[dict, torch.Tensor]) -> Union[dict, torch.Tensor]:
+        if isinstance(src, dict):
+            masks = {}
+            for tokenisation, tensor in src.items():
+                mask = tensor == self.pad_index
+                masks[tokenisation] = mask
+            return masks
+        else:
+            # src shape (batch size, src_seq_length)
+            mask = src == self.pad_index
+            return mask
+
+
+    def make_tgt_key_padding_mask(self, tgt):
+        # tgt shape (batch size, tgt_seq_length)
+        mask = tgt == self.pad_index
+        return mask
+
+
+class Transformer(BaseTransformer):
+    def __init__(self,
+                 source_vocab_size: int,
+                 target_vocab_size: int,
+                 embedding_size: int,
+                 num_heads: int,
+                 num_encoder_layers: int,
+                 num_decoder_layers: int,
+                 dropout: float,
+                 pad_index: int,
+                 max_len: int,
+                 device: str):
+        super().__init__(embedding_size, num_heads, num_encoder_layers, num_decoder_layers, dropout, pad_index, max_len, device)
+        self.source_vocab_size = source_vocab_size
+        self.target_vocab_size = target_vocab_size
+
+        # Word enbeddings for source and target
+        self.src_word_embedding = nn.Embedding(self.source_vocab_size, self.embedding_size)
+        self.tgt_word_embedding = nn.Embedding(self.target_vocab_size, self.embedding_size)
+
+        # Positional embeddings for source and target
+        self.src_pos_embedding = nn.Embedding(self.max_len, self.embedding_size)
+        self.tgt_pos_embedding = nn.Embedding(self.max_len, self.embedding_size)
+
+        # Transformer model
+        self.transformer = nn.Transformer(d_model=self.embedding_size,
+                                          nhead=self.num_heads,
+                                          num_encoder_layers=self.num_encoder_layers,
+                                          num_decoder_layers=self.num_decoder_layers,
+                                          dropout=self.dropout,
+                                          activation='relu',
+                                          batch_first=True)
+
+        # Fully connected layer
+        self.fc = nn.Linear(self.embedding_size, target_vocab_size)
+        self.dropout = nn.Dropout(self.dropout)
+        self.device = self.device
+
+
+    def forward(self, src, tgt):
+        # Get positional encodings
+        src_positional_embedding, tgt_positional_embedding = self.get_positional_word_embeddings(src, tgt)
+
+        src_embedded = self.dropout(self.src_word_embedding(src) + src_positional_embedding)
+        tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + tgt_positional_embedding)
 
         # So that the transformer knows where the padding is
         src_padding_mask = self.make_src_key_padding_mask(src).to(torch.float32)
         tgt_padding_mask = self.make_tgt_key_padding_mask(tgt).to(torch.float32)
-        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt_seq_length).to(self.device)
+        tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1]).to(self.device)
 
         # Transformer forward pass
         output = self.transformer(src=src_embedded,
