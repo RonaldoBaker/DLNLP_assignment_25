@@ -213,7 +213,7 @@ class Preprocessor:
 
 
     @staticmethod
-    def build_vocabularies(tokenised_data: list[dict[str, str]]) -> dict[str, Vocab]:
+    def build_vocabularies(tokenised_dictionaries: list[dict[str, str]]) -> dict[str, Vocab]:
         """
         Builds the vocabulary for the source and target languages
         from the tokenised data and returns the vocabulary of each language.
@@ -230,7 +230,7 @@ class Preprocessor:
         vocabularies = {} # Dictionary to store the vocabularies
 
         for token_type, vocab_name in Preprocessor.token_to_vocab_map.items():
-            tokens = (parallel_dict[token_type] for parallel_dict in tokenised_data)
+            tokens = (dictionary[token_type] for dictionary in tokenised_dictionaries)
             vocab = build_vocab_from_iterator(tokens, specials=special_tokens, min_freq=2)
             vocab.set_default_index(vocab["<unk>"])
             vocabularies[vocab_name] = vocab
@@ -239,7 +239,7 @@ class Preprocessor:
 
 
     @staticmethod
-    def __token_to_index(data: dict[str, str], vocabularies: dict[str, Vocab]):
+    def __token_to_index(tokenised_dictionary: dict[str, str], vocabularies: dict[str, Vocab]):
         """
         Maps the tokens to their corresponding indices using the vocabulary.
 
@@ -251,26 +251,21 @@ class Preprocessor:
         Returns:
             - (dict[str, str]): The uypdated dictionary containing the indices
         """
-        token_to_index_name_map ={"src_word_tokens": "src_word_ids",
-                             "tgt_word_tokens": "tgt_word_ids",
-                             "src_subword_tokens": "src_subword_ids",
-                             "src_syllable_tokens": "src_syllable_ids",
-                             "src_char_tokens": "src_char_ids"}
 
         # Using class mapping to access in-built numericalization methods from each Vocab object
         # in order to convert the tokens to indices
         indices_to_add = {}
 
         for token_type, vocab_name in Preprocessor.token_to_vocab_map.items():
-            indices = vocabularies[vocab_name].lookup_indices(data[token_type])
-            indices_to_add[token_to_index_name_map[token_type]] = indices
-        
-        data.update(indices_to_add)
-        return data
+            indices = vocabularies[vocab_name].lookup_indices(tokenised_dictionary[token_type])
+            indices_to_add[token_type.replace("_tokens", "_ids")] = indices
+
+        tokenised_dictionary.update(indices_to_add)
+        return tokenised_dictionary
 
 
     @staticmethod
-    def numericalise(tokenised_data: list[dict[str, str]], vocabularies: dict[str, Vocab]) -> list[dict]:
+    def numericalise(tokenised_dictionaries: list[dict[str, str]], vocabularies: dict[str, Vocab]) -> list[dict]:
         """
         Wraps the __token_to_index function into a lambda function
         and converts the tokenised data to indices using the vocabulary.
@@ -283,4 +278,4 @@ class Preprocessor:
         Returns:
             - (list[dict]): The tokenised data as a list of dictionaries containing the indices
         """
-        return list(map(lambda x: Preprocessor.__token_to_index(x, vocabularies), tokenised_data))
+        return list(map(lambda x: Preprocessor.__token_to_index(x, vocabularies), tokenised_dictionaries))
