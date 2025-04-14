@@ -159,7 +159,7 @@ class TransformerTrainer():
                             if token_id.item() == tgt_end_token:
                                 break
                             token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
-                        ref_tokens.append(token)
+                            ref_tokens.append(token)
                         # corpus_bleu expects a list of reference sentences per candidate (list of lists)
                         references.append(ref_tokens)
                 
