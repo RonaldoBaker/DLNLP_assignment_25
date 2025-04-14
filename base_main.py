@@ -51,34 +51,34 @@ def main():
     print("Created dictionary of parallel sentences")
 
     # Tokenise the data
-    tokenised_dataset = Preprocessor.create_tokenised_dataset(translation_dictionary)
+    tokenised_dictionaries = Preprocessor.create_tokenised_dataset(translation_dictionary)
     print("Dataset tokenised")
 
     # Create vocabulary
-    vocabularies = Preprocessor.build_vocabularies(tokenised_dataset)
+    vocabularies = Preprocessor.build_vocabularies(tokenised_dictionaries)
     eng_vocab = vocabularies["src_word_vocab"]
     spa_vocab = vocabularies["tgt_word_vocab"]
     print("Vocabulary built")
 
     # Convert the tokenised data to indices
-    indexed_dataset = Preprocessor.numericalise(tokenised_dataset, vocabularies)
+    indexed_dictionaries = Preprocessor.numericalise(tokenised_dictionaries, vocabularies)
     print("Dataset indexed")
 
     # Create the custom dataset
-    translation_dataset = TokenDataset(indexed_dataset, eng_vocab, spa_vocab, device)
+    token_dataset = TokenDataset(indexed_dictionaries, eng_vocab, spa_vocab, device)
     print("Custom dataset created")
 
     # Split the data into train, validation and test sets
-    train_dataset, val_dataset = train_test_split(translation_dataset, test_size=0.3, random_state=random_seed)
-    val_dataset, test_dataset = train_test_split(val_dataset, test_size=1/3, random_state=random_seed)
+    train_set, val_set = train_test_split(token_dataset, test_size=0.3, random_state=random_seed)
+    val_set, test_set = train_test_split(val_set, test_size=1/3, random_state=random_seed)
 
     # Collate function is used to pad the sequences to the same length
     wrapped_collate_fn = partial(collate_fn, source_vocab=eng_vocab, target_vocab=spa_vocab)
 
     # Define the dataloader
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=wrapped_collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=wrapped_collate_fn)
+    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
+    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
     print("Dataloader created")
 
     # MODEL TRAINING
