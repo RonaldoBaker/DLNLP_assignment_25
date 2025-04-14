@@ -110,11 +110,11 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy", beam_width=None)
+    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy")
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/base_loss_curves.png")
 
 if __name__ == '__main__':
     main()
