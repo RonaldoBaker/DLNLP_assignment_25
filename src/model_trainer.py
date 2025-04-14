@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torchtext.data.metrics import bleu_score
@@ -9,6 +10,7 @@ from torch.nn.functional import log_softmax
 from nltk.translate.bleu_score import corpus_bleu
 from tqdm import tqdm
 import heapq
+from evaluate import load
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -93,7 +95,7 @@ class TransformerTrainer():
         print(f"Training completed in {elapsed_time}")
 
 
-    def evaluate_bleu(self, tgt_vocab, max_len, type: str = "greedy", beam_width: int = None) -> float:
+    def evaluate(self, tgt_vocab, max_len, type: str = "greedy", beam_width: int = None):
         """
         Evaluate the model on the test set using BLEU score.
         
@@ -213,8 +215,20 @@ class TransformerTrainer():
                     raise ValueError("Invalid decoding type. Use 'greedy' or 'beam'.")
 
         bleu = corpus_bleu(references, candidates)
+
+        # Create a lists of strings instead of lists of lists for BERTScore
+        references = [" ".join(ref) for ref in references]
+        candidates = [" ".join(cand) for cand in candidates]
+
+        bertscore = load("bertscore")
+        results = bertscore.compute(predictions=candidates, references=references, lang="es", model_type="bert-base-uncased")
+        precision = np.mean(np.array(results["precision"]))
+        recall = np.mean(np.array(results["recall"]))
+        f1 = np.mean(np.array(results["f1"]))
+
+        print()
         print(f"BLEU score: {bleu:.4f}")
-        return bleu
+        print(f"BERTScore - MeanPrecision: {precision:.4f}, Mean Recall: {recall:.4f}, Mean F1: {f1:.4f}")
 
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):

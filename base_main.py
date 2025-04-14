@@ -111,7 +111,7 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate_bleu(tgt_vocab=spa_vocab, max_len=max_len, type="greedy")
+    trainer.evaluate(tgt_vocab=spa_vocab, max_len=max_len, type="greedy")
     print("Model evaluated")
 
     # Plot loss curves
