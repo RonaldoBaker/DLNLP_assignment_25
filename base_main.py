@@ -115,7 +115,7 @@ def main():
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/loss_curves.png")
 
 if __name__ == '__main__':
     main()

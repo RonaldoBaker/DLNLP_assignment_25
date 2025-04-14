@@ -17,6 +17,7 @@ from rich.console import Console
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.early_stopping import EarlyStopping
+from src.config import config
 
 class TransformerTrainer():
     def __init__(self, train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, model, device):
@@ -33,6 +34,36 @@ class TransformerTrainer():
         self.train_losses = []
         self.val_losses = []
         self.bertscore = load("bertscore")
+        self.best_val_loss = float("inf")
+
+
+    def save_checkpoint(self, mode: str):
+        """
+        Saves the model checkpoint.
+
+        Arg(s):
+            - mode (str): The mode of the checkpoint, either "best" or "last".
+            - path (str): The path to save the checkpoint. If empty, saves in the current directory.
+        """
+        path = config.SAVE_FILEPATH + f"checkpoints/{mode}_model.pth"
+
+        # Define checkpoint
+        checkpoint = {
+            "model": self.model.state_dict()
+        }
+        torch.save(checkpoint, path)
+
+
+    def load_model(self):
+
+        path = config.SAVE_FILEPATH + f"checkpoints/best_model.pth" 
+
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Checkpoint file not found at {path}")
+        else:
+            checkpoint = torch.load(path, map_location=self.device, weights_only=True)
+            self.model.load_state_dict(checkpoint["model"])
+
 
     def train(self, patience: int = 5, delta: int = 0):
         # Define early stopping
@@ -78,18 +109,26 @@ class TransformerTrainer():
 
                     loss = self.loss_func(output, tgt)
                     val_loss += loss.item()
-                
-                val_loss /= len(self.val_loader)
-                self.scheduler.step(val_loss)
-                self.val_losses.append(val_loss)
 
-                early_stopping(self.val_losses[-1])
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break
+            val_loss /= len(self.val_loader)
+            self.scheduler.step(val_loss)
+            self.val_losses.append(val_loss)
+
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+                self.save_checkpoint("best", path=config.SAVE_FILEPATH + "checkpoints/best_model.pt")
+                print(f"Best model saved at epoch {epoch + 1}")
+
+            early_stopping(self.val_losses[-1])
+            if early_stopping.early_stop:
+                print("Early stopping")
+                break
 
             print(f"Epoch {epoch + 1} | Train Loss: {self.train_losses[-1]} | Val Loss: {self.val_losses[-1]}")
             print()
+
+        # Save the last model
+        self.save_checkpoint(mode="last")
 
         # Mark the end time
         end_time = time.time()
@@ -190,6 +229,9 @@ class TransformerTrainer():
         Returns:
             - float: The corpus BLEU score.
         """
+        # Load the best model
+        self.load_model()
+        
         # Get the index-to-word mapping from the torchtext Vocab object.
         # Vocab.itos is a list where index corresponds to the token.
         itos = tgt_vocab.get_itos()

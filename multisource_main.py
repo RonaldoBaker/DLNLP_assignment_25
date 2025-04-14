@@ -117,7 +117,7 @@ def main():
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/multisource_loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/multisource_loss_curves.png")
 
 if __name__ == "__main__":
     main()
