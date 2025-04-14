@@ -30,6 +30,7 @@ class TransformerTrainer():
         # Store the losses while training to plot loss curves
         self.train_losses = []
         self.val_losses = []
+        self.bertscore = load("bertscore")
 
     def train(self, patience: int = 5, delta: int = 0):
         # Define early stopping
@@ -93,6 +94,29 @@ class TransformerTrainer():
 
         elapsed_time = time.strftime("Hh %Mm %Ss", time.gmtime(end_time - start_time))
         print(f"Training completed in {elapsed_time}")
+
+
+    def calculate_bertscore(self, references: list[list[str]], candidates: list[list[str]]):
+        """
+        Calculate BERTScore for the given references and candidates.
+
+        Arg(s):
+            - references: List of reference translations (list of lists).
+            - candidates: List of candidate translations (list of lists).
+
+        Returns:
+            - tuple: Mean precision, recall, and F1 score.
+        """
+        # Convert list of lists to list of strings
+        references = [" ".join(ref) for ref in references]
+        candidates = [" ".join(cand) for cand in candidates]
+
+        results = self.bertscore.compute(predictions=candidates, references=references, lang="es", model_type="bert-base-uncased")
+        precision = np.mean(np.array(results["precision"]))
+        recall = np.mean(np.array(results["recall"]))
+        f1 = np.mean(np.array(results["f1"]))
+
+        return precision, recall, f1
 
 
     def evaluate(self, tgt_vocab, max_len, type: str = "greedy", beam_width: int = None):
@@ -215,16 +239,7 @@ class TransformerTrainer():
                     raise ValueError("Invalid decoding type. Use 'greedy' or 'beam'.")
 
         bleu = corpus_bleu(references, candidates)
-
-        # Create a lists of strings instead of lists of lists for BERTScore
-        references = [" ".join(ref) for ref in references]
-        candidates = [" ".join(cand) for cand in candidates]
-
-        bertscore = load("bertscore")
-        results = bertscore.compute(predictions=candidates, references=references, lang="es", model_type="bert-base-uncased")
-        precision = np.mean(np.array(results["precision"]))
-        recall = np.mean(np.array(results["recall"]))
-        f1 = np.mean(np.array(results["f1"]))
+        precision, recall, f1 = self.calculate_bertscore(references, candidates)
 
         print()
         print(f"BLEU score: {bleu:.4f}")
