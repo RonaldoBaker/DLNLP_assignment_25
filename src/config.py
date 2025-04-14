@@ -1,0 +1,18 @@
+import os
+import argparse
+
+"""
+CLI arguments for the entire repo
+"""
+
+parser = argparse.ArgumentParser(description="CLI arguments for the entire repo")
+
+# for base_main.py and multisource_main.py
+parser.add_argument("--GPU", type=int, default="0", help="GPU id to use")
+parser.add_argument("-SFP", "--SAVE_FILEPATH", type=str, default="/home/zceerba/nlp/DLNLP_assignment_25/figures/", help="Path to save figures")
+
+# for multisource_main.py
+parser.add_argument("-FT", "--FUSION_TYPE", type=str, default="single", choices=["single", "multi"], help="Fusion type for multisource transformer")
+parser.add_argument("-TKNS", "--TOKENISATIONS", nargs="+", type=str, default=["word"], choices=["word", "subword", "syllable", "char"], help="Tokenisation to use for the multisource transformer")
+
+config = parser.parse_args()

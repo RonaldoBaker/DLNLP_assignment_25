@@ -1,4 +1,5 @@
 # Import dependencies
+import sys
 import torch
 from functools import partial
 from torch.utils.data import DataLoader
@@ -10,6 +11,7 @@ from src.preprocessor import Preprocessor
 from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
 from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
+from src.config import config
 
 # Define the hyperparameters
 random_seed = 7
@@ -27,7 +29,7 @@ lr = 0.0001
 
 # Set device
 if torch.cuda.is_available():
-    device_num = 5
+    device_num = config.GPU
     torch.cuda.set_device(device_num)
     device = torch.device(f"cuda:{device_num}")
 else:
@@ -62,7 +64,7 @@ def main():
     print("Dataset indexed")
 
     # Create the custom dataset
-    chosen_tokenisations = ["src_word_ids"]
+    chosen_tokenisations = ["src_" + tokenisation + "_ids" for tokenisation in config.TOKENISATIONS]
     token_dataset = MultiTokenDataset(indexed_dataset, chosen_tokenisations, device)
     print("Custom dataset created")
 
@@ -79,10 +81,9 @@ def main():
     print("Dataloader created")
 
     # MODEL TRAINING
-    vocab_sizes = {
-    "src_word_ids": len(vocabularies["src_word_vocab"]),
-    "tgt_word_ids": len(vocabularies["tgt_word_vocab"])
-    }
+    # Create dictionary of vocab sizes
+    vocab_sizes = {tokenisation: len(vocabularies[tokenisation.replace("_ids", "_vocab")]) 
+                   for tokenisation in indexed_dataset[0].keys() if tokenisation.endswith("_ids")}
 
     pad_index = vocabularies["src_word_vocab"]["<pad>"] # Pad index is the same for all vocabs
 
@@ -95,7 +96,7 @@ def main():
                                 max_len=max_len,
                                 device=device,
                                 pad_index=pad_index,
-                                fusion_type="single").to(device)
+                                fusion_type=config.FUSION_TYPE).to(device)
     print("Model created")
 
     loss_func = nn.CrossEntropyLoss(ignore_index=pad_index)

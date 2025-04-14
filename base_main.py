@@ -10,6 +10,7 @@ from src.preprocessor import Preprocessor
 from src.custom_dataset import TokenDataset, collate_fn
 from src.models import Transformer
 from src.model_trainer import TransformerTrainer
+from src.config import config
 
 # Define the hyperparameters
 random_seed = 7
@@ -27,7 +28,7 @@ lr = 0.0001
 
 # Set device
 if torch.cuda.is_available():
-    device_num = 1
+    device_num = config.GPU
     torch.cuda.set_device(device_num)
     device = torch.device(f"cuda:{device_num}")
 else:
@@ -114,7 +115,7 @@ def main():
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/base_loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "loss_curves.png")
 
 if __name__ == '__main__':
     main()
