@@ -300,10 +300,18 @@ class TransformerTrainer():
                 else:
                     raise ValueError("Invalid decoding type. Use 'greedy' or 'beam'.")
 
-        bleu = corpus_bleu(references, candidates)
-        precision, recall, f1 = self.calculate_bertscore(references, candidates)
-        ref_oov_rate, pred_oov_rate = self.calculate_oov_rates({"train_set_vocab": train_set, "test_set_vocab": test_set, "output_model_vocab": candidates_ids})
-        unk_rate = self.calculate_unknown_rate(candidates)
+        with tqdm(total=4, desc="Calculating Metrics", leave=True, unit="metric") as pbar:
+            bleu = corpus_bleu(references, candidates)
+            pbar.update(1)
+
+            precision, recall, f1 = self.calculate_bertscore(references, candidates)
+            pbar.update(1)
+
+            ref_oov_rate, pred_oov_rate = self.calculate_oov_rates({"train_set_vocab": train_set, "test_set_vocab": test_set, "output_model_vocab": candidates_ids})
+            pbar.update(1)
+
+            unk_rate = self.calculate_unknown_rate(candidates)
+            pbar.update(1)
 
         # Create a table
         table = Table(title="Evaluation Metrics")
