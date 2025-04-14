@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 from src.preprocessor import Preprocessor
 from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
-from src.models import Transformer, MultiSourceTransformer
+from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
 
 # Define the hyperparameters
@@ -35,7 +35,7 @@ else:
 print(f"Running on {device}")
 
 def main():
-        # Set random seed for reproducibility
+    # Set random seed for reproducibility
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed_all(random_seed)
     torch.backends.cudnn.deterministic = True
@@ -112,11 +112,11 @@ def main():
     print("Model trained")
 
     # Evaluate the model
-    trainer.evaluate_bleu(tgt_vocab=vocabularies["tgt_word_vocab"], max_len=max_len, type="greedy", beam_width=None)
+    trainer.evaluate_bleu(tgt_vocab=vocabularies["tgt_word_vocab"], max_len=max_len, type="greedy")
     print("Model evaluated")
 
     # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/loss_curves.png")
+    trainer.plot_loss_curves(epoch_resolution=1, path="/home/zceerba/nlp/DLNLP_assignment_25/multisource_loss_curves.png")
 
 if __name__ == "__main__":
     main()
