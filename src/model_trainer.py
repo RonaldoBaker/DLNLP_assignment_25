@@ -11,6 +11,8 @@ from nltk.translate.bleu_score import corpus_bleu
 from tqdm import tqdm
 import heapq
 from evaluate import load
+from rich.table import Table
+from rich.console import Console
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -119,7 +121,63 @@ class TransformerTrainer():
         return precision, recall, f1
 
 
-    def evaluate(self, tgt_vocab, max_len, type: str = "greedy", beam_width: int = None):
+    def calculate_oov_rates(self, sequences: dict):
+        """
+        Calculate the Out-Of-Vocabulary (OOV) rates for the given potential vocabularies.
+        """
+        vocabs = {}
+        for name, seq in sequences.items():
+            vocabs[name] = self.get_vocab(seq)
+
+        train_vocab = vocabs["train_set_vocab"]
+        test_vocab = vocabs["test_set_vocab"]
+        output_model_vocab = vocabs["output_model_vocab"]
+
+        # Calculate the reference OOV rate
+        reference_oov_rate = len(test_vocab - train_vocab) / len(test_vocab) * 100
+
+        # Calculate the prediction OOV rate
+        prediction_oov_rate = len(output_model_vocab - train_vocab) / len(output_model_vocab) * 100
+
+        return reference_oov_rate, prediction_oov_rate
+
+
+    def get_vocab(self, dataset: list):
+        """
+        Get the vocabulary from the dataset
+        Arg(s):
+        - dataset: The dataset to get the vocabulary from - it should be a TokenDataset object
+        """
+        vocab = set()
+        if isinstance(dataset, list):
+
+            if all(isinstance(item, list) for item in dataset):
+                # If the dataset is a list of lists, iterate over each sentence
+                for sentence in dataset:
+                    vocab.update(sentence)
+
+            elif all(isinstance(item, tuple) for item in dataset):
+                for _, tgt_tensor in dataset:
+                    tgt_tokens = tgt_tensor.cpu().numpy().tolist()
+                    vocab.update(tgt_tokens)
+
+        return vocab
+
+
+    def calculate_unknown_rate(self, sequences: list[list[str]]):
+        """
+        Calculate the unknown rate for the given list of lists.
+        Arg(s):
+            - list[list[str]]: List of lists of strings.
+        Returns:
+            - float: The unknown rate.
+        """
+        total_tokens = sum(len(sublist) for sublist in sequences)
+        unknown_tokens = sum(1 for sublist in sequences for token in sublist if token == "<unk>")
+        return unknown_tokens / total_tokens * 100
+
+
+    def evaluate(self, tgt_vocab, max_len, train_set, test_set, type: str = "greedy", beam_width: int = None):
         """
         Evaluate the model on the test set using BLEU score.
         
@@ -144,6 +202,7 @@ class TransformerTrainer():
             raise ValueError("Target vocabulary must contain <sos> and <eos> tokens.")
 
         candidates = []
+        candidates_ids = []
         references = []
         self.model.eval()
 
@@ -170,14 +229,17 @@ class TransformerTrainer():
                     for pred_seq, tgt_seq in zip(preds, tgt):
                         # Convert prediction token IDs to words, skipping the <sos> token.
                         pred_tokens = []
+                        pred_ids = []
                         for token_id in pred_seq[1:]:
                             if token_id.item() == tgt_end_token:
                                 break
                             # Make sure the index is within bounds.
+                            pred_ids.append(token_id.item())
                             token = itos[token_id.item()] if token_id.item() < len(itos) else "<unk>"
                             pred_tokens.append(token)
                         # corpus bleu expects a list of reference sentences per candidate (list of lists)
                         candidates.append(pred_tokens)
+                        candidates_ids.append(pred_ids)
 
                         # Process the reference translation (skipping the <sos> token).
                         ref_tokens = []
@@ -240,10 +302,28 @@ class TransformerTrainer():
 
         bleu = corpus_bleu(references, candidates)
         precision, recall, f1 = self.calculate_bertscore(references, candidates)
+        ref_oov_rate, pred_oov_rate = self.calculate_oov_rates({"train_set_vocab": train_set, "test_set_vocab": test_set, "output_model_vocab": candidates_ids})
+        unk_rate = self.calculate_unknown_rate(candidates)
 
-        print()
-        print(f"BLEU score: {bleu:.4f}")
-        print(f"BERTScore - MeanPrecision: {precision:.4f}, Mean Recall: {recall:.4f}, Mean F1: {f1:.4f}")
+        # Create a table
+        table = Table(title="Evaluation Metrics")
+
+        # Add columns
+        table.add_column("Metric", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Value", justify="right", style="magenta")
+
+        # Add rows with the results
+        table.add_row("BLEU Score", f"{bleu:.4f}")
+        table.add_row("Precision", f"{precision:.4f}")
+        table.add_row("Recall", f"{recall:.4f}")
+        table.add_row("F1 Score", f"{f1:.4f}")
+        table.add_row("Reference OOV Rate (%)", f"{ref_oov_rate:.2f}")
+        table.add_row("Prediction OOV Rate (%)", f"{pred_oov_rate:.2f}")
+        table.add_row("Unknown Rate (%)", f"{unk_rate:.2f}")
+
+        # Display the table
+        console = Console()
+        console.print(table)
 
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):
