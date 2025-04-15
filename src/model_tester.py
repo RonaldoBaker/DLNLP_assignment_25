@@ -10,7 +10,10 @@ from evaluate import load
 from rich.table import Table
 from rich.console import Console
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# Append project root to sys.path
+project_root = os.path.join(os.path.dirname(__file__), "..")
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 from src.config import config
 
