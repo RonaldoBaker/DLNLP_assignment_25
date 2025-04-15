@@ -10,6 +10,7 @@ from src.preprocessor import Preprocessor
 from src.custom_dataset import TokenDataset, collate_fn
 from src.models import Transformer
 from src.model_trainer import TransformerTrainer
+from src.model_tester import TransformerTester
 from src.config import config
 
 # Define the hyperparameters
@@ -104,18 +105,19 @@ def main():
 
     # Define model trainer
     trainer = TransformerTrainer(train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, transformer, device)
-    print("Model trainer created")
+    tester = TransformerTester(test_loader, transformer, device)
+    print("Model trainer and tester created")
 
     # Train the model
     trainer.train(patience=2)
     print("Model trained")
 
-    # Evaluate the model
-    trainer.evaluate(tgt_vocab=spa_vocab, max_len=max_len, train_set=train_set, test_set=test_set, type="greedy")
-    print("Model evaluated")
-
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/loss_curves.png")
+
+    # Evaluate the model
+    tester.evaluate(tgt_vocab=spa_vocab, max_len=max_len, train_set=train_set, test_set=test_set, type="greedy")
+    print("Model evaluated")
 
 if __name__ == '__main__':
     main()
