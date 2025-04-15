@@ -12,7 +12,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from src.early_stopping import EarlyStopping
-from src.config import config
+from utils.config import config
 
 class TransformerTrainer:
     def __init__(self, train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, model, device):

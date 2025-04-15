@@ -18,7 +18,7 @@ if project_root not in sys.path:
 from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
 from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
-from src.config import config
+from utils.config import config
 
 # Define the hyperparameters
 random_seed = 7

@@ -19,7 +19,7 @@ from src.custom_dataset import TokenDataset, collate_fn
 from src.models import Transformer
 from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
-from src.config import config
+from utils.config import config
 
 # Define the hyperparameters
 random_seed = 7

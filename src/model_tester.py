@@ -15,7 +15,7 @@ project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.config import config
+from utils.config import config
 
 class TransformerTester:
     def __init__(self, test_loader, model, device):
