@@ -8,16 +8,17 @@ from torch import nn
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
-from src.preprocessor import Preprocessor
 
 # Append project root to sys.path
 project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+from src.preprocessor import Preprocessor
 from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
 from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
+from src.model_tester import TransformerTester
 from utils.config import config
 
 # Define the hyperparameters
@@ -60,15 +61,15 @@ def main():
 
     # Tokenise the data
     tokenised_dictionaries = Preprocessor.create_tokenised_dataset(translation_dictionary)
-    print("Dataset tokenised")
+    print("Dictionaries tokenised")
 
     # Create vocabulary
     vocabularies = Preprocessor.build_vocabularies(tokenised_dictionaries)
-    print("Vocabulary built")
+    print("Vocabularies built")
 
     # Convert the tokenised data to indices
     indexed_dictionaries = Preprocessor.numericalise(tokenised_dictionaries, vocabularies)
-    print("Dataset indexed")
+    print("Dictionaries indexed")
 
     # Create the custom dataset
     chosen_tokenisations = ["src_" + tokenisation + "_ids" for tokenisation in config.TOKENISATIONS]
@@ -100,9 +101,9 @@ def main():
                                 num_encoder_layers=num_encoder_layers,
                                 num_decoder_layers=num_decoder_layers,
                                 dropout=dropout,
+                                pad_index=pad_index,
                                 max_len=max_len,
                                 device=device,
-                                pad_index=pad_index,
                                 fusion_type=config.FUSION_TYPE).to(device)
     print("Model created")
 
@@ -112,19 +113,21 @@ def main():
     print("Loss function, optimiser and scheduler defined")
 
     # Define model trainer
-    trainer = TransformerTrainer(train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, model, device)
+    trainer = TransformerTrainer(train_loader, val_loader, epochs, optimiser, scheduler, loss_func, model, device)
+    tester = TransformerTester(test_loader, model, device)
     print("Model trainer created")
 
     # Train the model
     trainer.train(patience=2)
     print("Model trained")
 
-    # Evaluate the model
-    trainer.evaluate(tgt_vocab=vocabularies["tgt_word_vocab"], max_len=max_len, type="greedy")
-    print("Model evaluated")
-
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/multisource_loss_curves.png")
+
+    # Evaluate the model
+    tester.evaluate(tgt_vocab=vocabularies["tgt_word_vocab"], max_len=max_len, train_set=train_set, test_set=test_set, type="greedy")
+    print("Model evaluated")
+
 
 if __name__ == "__main__":
     main()

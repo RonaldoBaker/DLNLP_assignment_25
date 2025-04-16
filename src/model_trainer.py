@@ -15,10 +15,9 @@ from src.early_stopping import EarlyStopping
 from utils.config import config
 
 class TransformerTrainer:
-    def __init__(self, train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, model, device):
+    def __init__(self, train_loader, val_loader, epochs, optimiser, scheduler, loss_func, model, device):
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.test_loader = test_loader
         self.epochs = epochs
         self.optimiser = optimiser
         self.scheduler = scheduler

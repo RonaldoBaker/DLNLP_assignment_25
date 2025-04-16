@@ -61,7 +61,7 @@ def main():
 
     # Tokenise the data
     tokenised_dictionaries = Preprocessor.create_tokenised_dataset(translation_dictionary)
-    print("Dataset tokenised")
+    print("Dictionaries tokenised")
 
     # Create vocabulary
     vocabularies = Preprocessor.build_vocabularies(tokenised_dictionaries)
@@ -71,7 +71,7 @@ def main():
 
     # Convert the tokenised data to indices
     indexed_dictionaries = Preprocessor.numericalise(tokenised_dictionaries, vocabularies)
-    print("Dataset indexed")
+    print("Dictionaries indexed")
 
     # Create the custom dataset
     token_dataset = TokenDataset(indexed_dictionaries, eng_vocab, spa_vocab, device)
@@ -93,7 +93,7 @@ def main():
     # MODEL TRAINING
     src_pad_index = eng_vocab["<pad>"]
     # Define the model
-    transformer = Transformer(source_vocab_size=len(eng_vocab),
+    model = Transformer(source_vocab_size=len(eng_vocab),
                               target_vocab_size=len(spa_vocab),
                               embedding_size=embedding_size,
                               num_heads=num_heads,
@@ -107,13 +107,13 @@ def main():
 
     # Define the loss function, optimiser and scheduler
     loss_func = nn.CrossEntropyLoss(ignore_index=src_pad_index)
-    optimiser = optim.Adam(transformer.parameters(), lr=lr)
+    optimiser = optim.Adam(model.parameters(), lr=lr)
     scheduler = ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=1)
     print("Loss function, optimiser and scheduler defined")
 
     # Define model trainer
-    trainer = TransformerTrainer(train_loader, val_loader, test_loader, epochs, optimiser, scheduler, loss_func, transformer, device)
-    tester = TransformerTester(test_loader, transformer, device)
+    trainer = TransformerTrainer(train_loader, val_loader, epochs, optimiser, scheduler, loss_func, model, device)
+    tester = TransformerTester(test_loader, model, device)
     print("Model trainer and tester created")
 
     # Train the model
