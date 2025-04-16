@@ -123,8 +123,8 @@ def main():
     print("Model trainer and tester created")
 
     # Train the model
-    # trainer.train(patience=2)
-    # print("Model trained")
+    trainer.train(patience=2)
+    print("Model trained")
 
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/loss_curves.png")
