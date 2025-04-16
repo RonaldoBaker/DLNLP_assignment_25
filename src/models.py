@@ -69,7 +69,7 @@ class BaseTransformer(nn.Module):
     def make_tgt_key_padding_mask(self, tgt):
         # tgt shape (batch size, tgt_seq_length)
         mask = tgt == self.pad_index
-        return mask.to(torch.float32)
+        return mask
 
 
 class Transformer(BaseTransformer):
