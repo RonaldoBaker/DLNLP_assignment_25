@@ -223,7 +223,7 @@ class MultiSourceTransformer(BaseTransformer):
         Returns:
             A square subsequent mask.
         """
-        mask = torch.triu(torch.full((size, size), float("-inf")), diagonal=1).float()
+        mask = torch.triu(torch.full((size, size), float("-inf")), diagonal=1).bool()
         return mask
 
 
