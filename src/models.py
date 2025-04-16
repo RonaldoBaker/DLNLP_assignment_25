@@ -58,12 +58,12 @@ class BaseTransformer(nn.Module):
             masks = {}
             for tokenisation, tensor in src.items():
                 mask = tensor == self.pad_index
-                masks[tokenisation] = mask.to(torch.float32)
+                masks[tokenisation] = mask
             return masks
         else:
             # src shape (batch size, src_seq_length)
             mask = src == self.pad_index
-            return mask.to(torch.float32)
+            return mask
 
 
     def make_tgt_key_padding_mask(self, tgt):
@@ -121,7 +121,10 @@ class Transformer(BaseTransformer):
         # So that the transformer knows where the padding is
         src_padding_mask = self.make_src_key_padding_mask(src)
         tgt_padding_mask = self.make_tgt_key_padding_mask(tgt)
+        # assert src_padding_mask.shape == (src_embedded.shape[0], src_embedded.shape[1]), "src_key_padding_mask shape mismatch"
+        # assert tgt_padding_mask.shape == (tgt_embedded.shape[0], tgt_embedded.shape[1]), "tgt_key_padding_mask shape mismatch"
         tgt_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1], device=self.device, dtype=torch.float32)
+        # assert tgt_mask.shape == (tgt.shape[1], tgt.shape[1]), "tgt_mask shape mismatch"
 
         # Transformer forward pass
         output = self.transformer(src=src_embedded,

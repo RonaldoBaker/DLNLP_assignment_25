@@ -8,6 +8,12 @@ from torch import nn
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
+"""
+Ignore warnings for PyTorch nested tensors
+This occurs due to the PyTorch version (2.3.0) being used, which is needed to use torchtext version 0.18.0
+"""
+import warnings
+warnings.filterwarnings("ignore", message="The PyTorch API of nested tensors is in prototype stage") 
 
 # Append project root to sys.path
 project_root = os.path.join(os.path.dirname(__file__), "..")
@@ -117,8 +123,8 @@ def main():
     print("Model trainer and tester created")
 
     # Train the model
-    trainer.train(patience=2)
-    print("Model trained")
+    # trainer.train(patience=2)
+    # print("Model trained")
 
     # Plot loss curves
     trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/loss_curves.png")
