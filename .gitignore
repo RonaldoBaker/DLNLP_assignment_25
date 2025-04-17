@@ -164,3 +164,8 @@ cython_debug/
 
 # MacOS Finder directory files
 .DS_Store
+
+# Project-specific folders
+figures/
+logs/
+checkpoints/
