@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import torch
 from torch.nn.functional import log_softmax
-from nltk.translate.bleu_score import corpus_bleu
+from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction
 from tqdm import tqdm
 import heapq
 from evaluate import load
@@ -23,6 +23,7 @@ class TransformerTester:
         self.model = model
         self.device = device
         self.bertscore = load("bertscore")
+        self.smoothie = SmoothingFunction().method4  # Use method4 for BLEU score smoothing
 
     
     def load_model(self):
@@ -245,7 +246,7 @@ class TransformerTester:
                     raise ValueError("Invalid decoding type. Use 'greedy' or 'beam'.")
 
         with tqdm(total=4, desc="Calculating Metrics", leave=True, unit="metric") as pbar:
-            bleu = corpus_bleu(references, candidates)
+            bleu = corpus_bleu(references, candidates, smoothing_function=self.smoothie)
             pbar.update(1)
 
             precision, recall, f1 = self.calculate_bertscore(references, candidates)
