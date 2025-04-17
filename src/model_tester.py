@@ -259,6 +259,17 @@ class TransformerTester:
             unk_rate = self.calculate_unknown_rate(candidates)
             pbar.update(1)
 
+        # Create a dictionary to store the results and access from the logger
+        self.results = {
+            "bleu": bleu,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "ref_oov_rate": ref_oov_rate,
+            "pred_oov_rate": pred_oov_rate,
+            "unk_rate": unk_rate
+        }
+
         # Create a table
         table = Table(title="Evaluation Metrics")
 
