@@ -25,6 +25,7 @@ from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
 from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
+from utils.logger import Logger
 from utils.config import config
 
 # Define the hyperparameters
@@ -38,6 +39,22 @@ max_len = 100
 batch_size = 64
 epochs = 50
 lr = 0.0001
+
+# Define parameter dictionary for logging
+hyperparameters = {
+    "random_seed": random_seed,
+    "embedding_size": embedding_size,
+    "num_heads": num_heads,
+    "num_encoder_layers": num_encoder_layers,
+    "num_decoder_layers": num_decoder_layers,
+    "dropout": dropout,
+    "max_len": max_len,
+    "batch_size": batch_size,
+    "epochs": epochs,
+    "lr": lr,
+    "fusion_type": config.FUSION_TYPE,
+    "tokenisations": config.TOKENISATIONS
+}
 
 # /home/zceerba/.conda/envs/nlp/bin/python
 
@@ -124,17 +141,19 @@ def main():
     print("Model trainer created")
 
     # Train the model
-    print(f"TRAINING CONFIGURATION: MULTI SOURCE | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS}")
+    print(f"TRAINING CONFIGURATION: {config.MODEL} | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS}")
     trainer.train(patience=3)
     print("Model trained")
-
-    # Plot loss curves
-    trainer.plot_loss_curves(epoch_resolution=1, path=config.SAVE_FILEPATH + "figures/multisource_loss_curves.png")
 
     # Evaluate the model
     tester.evaluate(tgt_vocab=vocabularies["tgt_word_vocab"], max_len=max_len, train_set=train_set, test_set=test_set, type="greedy")
     print("Model evaluated")
 
+    # Log information for this run
+    logger = Logger(trainer, tester, hyperparameters, config.MODEL)
+    logger.log_all()
+    print("Model training and evaluation logged")
+    print("DONE\n")
 
 if __name__ == "__main__":
     main()
