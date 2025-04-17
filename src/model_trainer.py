@@ -36,6 +36,8 @@ class TransformerTrainer:
         self.best_val_loss = float("inf")
         self.best_val_bleu = float("-inf")
         self.smoothie = SmoothingFunction().method4 # Use method4 for BLEU score smoothing
+        self.best_model = None
+        self.last_model = None
 
 
     def save_checkpoint(self, mode: str):
@@ -52,6 +54,10 @@ class TransformerTrainer:
         checkpoint = {
             "model": self.model.state_dict()
         }
+        if mode == "best":
+            self.best_model = checkpoint
+        elif mode == "last":
+            self.last_model = checkpoint
         torch.save(checkpoint, path)
 
 
@@ -161,7 +167,7 @@ class TransformerTrainer:
             self.val_bleus.append(val_bleu)
 
             if val_bleu > self.best_val_bleu:
-                self.best_val_loss = val_loss
+                self.best_val_bleu = val_bleu
                 self.save_checkpoint("best")
                 print(f"Best model saved at epoch {epoch + 1}")
 
@@ -179,8 +185,11 @@ class TransformerTrainer:
         # Mark the end time
         end_time = time.time()
 
-        elapsed_time = time.strftime("Hh %Mm %Ss", time.gmtime(end_time - start_time))
-        print(f"Training completed in {elapsed_time}")
+        elapsed_seconds = end_time - start_time
+        hours, remainder = divmod(elapsed_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        self.elapsed_time = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+        print(f"Training completed in {self.elapsed_time}")
 
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):
