@@ -118,12 +118,13 @@ def main():
     print("Loss function, optimiser and scheduler defined")
 
     # Define model trainer
-    trainer = TransformerTrainer(train_loader, val_loader, epochs, optimiser, scheduler, loss_func, model, device)
+    trainer = TransformerTrainer(train_loader, val_loader, spa_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device)
     tester = TransformerTester(test_loader, model, device)
     print("Model trainer and tester created")
 
     # Train the model
-    trainer.train(patience=2)
+    print("TRAINING CONFIGURATION: SINGLE SOURCE | TOKENISATIONS = ['word']")
+    trainer.train(patience=3)
     print("Model trained")
 
     # Plot loss curves

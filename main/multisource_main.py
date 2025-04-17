@@ -8,6 +8,12 @@ from torch import nn
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
+"""
+Ignore warnings for PyTorch nested tensors
+This occurs due to the PyTorch version (2.3.0) being used, which is needed to use torchtext version 0.18.0
+"""
+import warnings
+warnings.filterwarnings("ignore", message="The PyTorch API of nested tensors is in prototype stage") 
 
 # Append project root to sys.path
 project_root = os.path.join(os.path.dirname(__file__), "..")
@@ -113,12 +119,13 @@ def main():
     print("Loss function, optimiser and scheduler defined")
 
     # Define model trainer
-    trainer = TransformerTrainer(train_loader, val_loader, epochs, optimiser, scheduler, loss_func, model, device)
+    trainer = TransformerTrainer(train_loader, val_loader, vocabularies["tgt_word_vocab"], max_len, epochs, optimiser, scheduler, loss_func, model, device)
     tester = TransformerTester(test_loader, model, device)
     print("Model trainer created")
 
     # Train the model
-    trainer.train(patience=2)
+    print(f"TRAINING CONFIGURATION: MULTI SOURCE | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS}")
+    trainer.train(patience=3)
     print("Model trained")
 
     # Plot loss curves
