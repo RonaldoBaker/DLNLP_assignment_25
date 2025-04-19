@@ -26,9 +26,12 @@ class Logger:
         now = datetime.datetime.now()
         timestamp_str = now.strftime("%Y.%m.%d_%H:%M:%S")
 
+        # Add tokenisation to the log directory name
+        tokenisations = "_".join(self.hyperparameters["tokenisations"])
+
         # Create a new directory for the current run
-        inner_log_dirtimestamp_str = f"{inner_log_dir}_{timestamp_str}" # base_2023.10.01_12:00:00 for example
-        # /home/zceerba/nlp/DLNLP_assignment_25/logs/base/base_2023.10.01_12:00:00
+        inner_log_dirtimestamp_str = f"{inner_log_dir}_{tokenisations}_{timestamp_str}" # single_2023.10.01_12:00:00 for example / multi_word_subword_2023.10.01_12:00:00
+        # /home/zceerba/nlp/DLNLP_assignment_25/logs/single/single_2023.10.01_12:00:00
         log_dir = os.path.join(config.LOG_PATH, inner_log_dir, inner_log_dirtimestamp_str)
 
         if not os.path.exists(log_dir):
