@@ -34,7 +34,7 @@ embedding_size = 512
 num_heads = 8
 num_encoder_layers = 6
 num_decoder_layers = 6
-dropout = 0.2
+dropout = config.DROPOUT
 max_len = 100
 batch_size = 64
 epochs = 50
@@ -170,7 +170,7 @@ def main():
     print("Model trainer and tester created")
 
     # Train the model
-    print(f"TRAINING CONFIGURATION: {config.MODEL} | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS}")
+    print(f"TRAINING CONFIGURATION: {config.MODEL} | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS} | DROPOUT = {config.DROPOUT}")
     trainer.train(patience=3)
     print("Model trained")
 
