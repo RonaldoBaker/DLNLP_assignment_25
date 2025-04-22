@@ -151,9 +151,7 @@ class Preprocessor:
         tgt_word_tokens = [token.text for token in tokenisers["tgt_word_tokeniser"].tokenizer(pair["tgt"])][:max_length]
 
         # Subword tokenisation
-        src_subword_tokens = tokenisers["src_subword_tokeniser"].tokenize(pair["src"])
-        # Occassionally appends an underscore to the beginning of the token so remove that
-        src_subword_tokens = [token[1:] if token.startswith("▁") else token for token in src_subword_tokens][:max_length]
+        src_subword_tokens = tokenisers["src_subword_tokeniser"].tokenize(pair["src"])[:max_length]
 
         # Syllable tokenisation
         src_syllable_tokens = [tokenisers["src_syllable_tokeniser"].tokenize(word_token) for word_token in src_word_tokens]
