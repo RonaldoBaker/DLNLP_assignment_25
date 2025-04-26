@@ -1,6 +1,7 @@
 from typing import Union
 import torch 
 import torch.nn as nn
+import sys
 
 class BaseTransformer(nn.Module):
     def __init__(self,
@@ -65,9 +66,13 @@ class BaseTransformer(nn.Module):
             src_embeddings: Source embeddings with positional information from word tokenisations.
             tgt_embeddings: Target embeddings with positional information from word tokenisations.
         """
+        # Check that the number of input sequences is equal to the number of positional embedding layers
+        assert len(sequences) == len(self.seq_pos_embedding_layers), \
+            f"Number of input sequences ({len(sequences)}) does not match the number of positional embedding layers ({len(self.seq_pos_embedding_layers)})"
+        
         positional_embeddings = {}
 
-        for tokenisation, sequence in sequences.items():
+        for i, (tokenisation, sequence) in enumerate(sequences.items()):
             # Batch size and sequence length
             N, seq_length = sequence.shape
 
@@ -75,7 +80,7 @@ class BaseTransformer(nn.Module):
             positions = torch.arange(0, seq_length).unsqueeze(0).expand(N, seq_length).to(self.device)
 
             # Get positional embeddings using the tokenisation key
-            positional_embeddings[tokenisation] = self.seq_pos_embedding_layers[tokenisation](positions)
+            positional_embeddings[tokenisation] = self.seq_pos_embedding_layers[i](positions)
 
         return positional_embeddings
 
@@ -120,10 +125,12 @@ class Transformer(BaseTransformer):
         self.tgt_word_embedding = nn.Embedding(self.target_vocab_size, self.embedding_size)
 
         # Positional embeddings for source and target
-        self.seq_pos_embedding_layers = nn.ModuleDict({
-            "src_word_ids": nn.Embedding(self.max_len, self.embedding_size),
-            "tgt_word_ids": nn.Embedding(self.max_len, self.embedding_size)
-        })
+        # self.seq_pos_embedding_layers = nn.ModuleDict({
+        #     "src_word_ids": nn.Embedding(self.max_len, self.embedding_size),
+        #     "tgt_word_ids": nn.Embedding(self.max_len, self.embedding_size)
+        # })
+        self.seq_pos_embedding_layers = nn.ModuleList([
+            nn.Embedding(self.max_len, self.embedding_size) for _ in range(2)])
 
         # Transformer model
         self.transformer = nn.Transformer(d_model=self.embedding_size,
@@ -158,7 +165,6 @@ class Transformer(BaseTransformer):
                                   tgt_mask=tgt_mask,
                                   src_key_padding_mask=src_padding_mask,
                                   tgt_key_padding_mask=tgt_padding_mask)
-
         # Fully connected layer
         output = self.fc(output)
 
@@ -212,21 +218,20 @@ class MultiSourceTransformer(BaseTransformer):
         self.num_sources = len(vocab_sizes)
         self.fusion_type = fusion_type
 
-        # Positional embeddings for source and target
-        self.src_pos_embedding = nn.Embedding(max_len, embedding_size)
-        self.tgt_pos_embedding = nn.Embedding(max_len, embedding_size)
-
         # Create embeddings and encoders dynamically
-        self.src_embeddings = nn.ModuleDict(
-            {tokenisation: nn.Embedding(vocab_size, self.embedding_size) for tokenisation, vocab_size in self.vocab_sizes.items()})
+        self.seq_pos_embedding_layers = nn.ModuleList([
+            nn.Embedding(max_len, embedding_size) for _ in range(self.num_sources)]) # Positional embeddings for each tokenisation
+    
+        self.embedding_layers = nn.ModuleDict(
+            {tokenisation: nn.Embedding(vocab_size, self.embedding_size) for tokenisation, vocab_size in self.vocab_sizes.items()}) # Embedding layers for each tokenisation
+
         self.encoders = nn.ModuleList([
             nn.TransformerEncoder(
                 nn.TransformerEncoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_encoder_layers
             ) for _ in range(self.num_sources)
-        ])
+        ]) # Transformer encoders for each tokenisation
 
         # Using word-level tokenisation as the output
-        self.tgt_embedding = nn.Embedding(self.vocab_sizes["tgt_word_ids"], self.embedding_size)
         self.decoder = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_decoder_layers
         )
@@ -255,19 +260,23 @@ class MultiSourceTransformer(BaseTransformer):
 
 
     def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
-        # # Get positional encodings using the word-level tokenisation
-        src_positional_embedding, tgt_positional_embedding = self.get_positional_word_embeddings(srcs, tgt)
+        # # Get positional encodings
+        sequences = srcs.copy()
+        sequences.update({"tgt_word_ids": tgt})
+        positional_embeddings = self.get_sequential_positional_embedding(sequences)
 
         # Get the embeddings for source tokenisations and target tokenisation
-        src_embeddings = {tokenisation: self.src_embeddings[tokenisation](tensor) for tokenisation, tensor in srcs.items()}
-        tgt_embedding = self.tgt_embedding(tgt)
+        embeddings = {tokenisation: self.embedding_layers[tokenisation](tensor) for tokenisation, tensor in sequences.items()}
 
-        # Add positional embeddings to the source and target word embeddings
-        src_embeddings["src_word_ids"] = self.dropout(src_embeddings["src_word_ids"] + src_positional_embedding)
-        tgt_embedding = self.dropout(tgt_embedding + tgt_positional_embedding)
+        # Add positional embeddings to the source and target embedding and apply dropout
+        embeddings = {tokenisation: self.dropout(embedding + positional_embeddings[tokenisation]) for tokenisation, embedding in embeddings.items()}
 
         # Make source key padding masks
         src_key_padding_masks = self.make_src_key_padding_mask(srcs)
+
+        # Split the embeddings dictionary into source and target embeddings
+        tgt_embedding = embeddings.pop("tgt_word_ids") # Remove target tokenisation from the source embeddings
+        src_embeddings = embeddings 
 
         # Encoder forward pass
         encoded_outputs = {}
