@@ -130,7 +130,8 @@ def main():
 
     # Create dictionary of vocab sizes
     vocab_sizes = {tokenisation: len(vocabularies[tokenisation.replace("_ids", "_vocab")]) 
-                   for tokenisation in indexed_dictionaries[0].keys() if tokenisation.endswith("_ids")}
+                   for tokenisation in indexed_dictionaries[0].keys()
+                    if tokenisation.endswith("_ids") and tokenisation.split("_")[1] in config.TOKENISATIONS}
 
     # Define the model
     if config.MODEL == "single":
