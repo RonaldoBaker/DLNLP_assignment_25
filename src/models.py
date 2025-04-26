@@ -33,6 +33,8 @@ class BaseTransformer(nn.Module):
             src_embeddings: Source embeddings with positional information from word tokenisations.
             tgt_embeddings: Target embeddings with positional information from word tokenisations.
         """
+        raise DeprecationWarning("This method is deprecated. Use get_sequential_positional_embedding instead.")
+
         if isinstance(src, dict):
             src = src["src_word_ids"]
 
@@ -51,6 +53,31 @@ class BaseTransformer(nn.Module):
         tgt_positional_embedding = self.tgt_pos_embedding(tgt_positions)
 
         return src_positional_embedding, tgt_positional_embedding
+    
+
+    def get_sequential_positional_embedding(self, sequences: dict[str, torch.tensor]):
+        """
+        Get positional word embeddings for source and target sequences.
+        Args:
+            src: Source sequence (dict of different source tokenisations or tensor).
+            tgt: Target sequence (tensor).
+        Returns:
+            src_embeddings: Source embeddings with positional information from word tokenisations.
+            tgt_embeddings: Target embeddings with positional information from word tokenisations.
+        """
+        positional_embeddings = {}
+
+        for tokenisation, sequence in sequences.items():
+            # Batch size and sequence length
+            N, seq_length = sequence.shape
+
+            # Using a simple sequential positional encoding
+            positions = torch.arange(0, seq_length).unsqueeze(0).expand(N, seq_length).to(self.device)
+
+            # Get positional embeddings using the tokenisation key
+            positional_embeddings[tokenisation] = self.seq_pos_embedding_layers[tokenisation](positions)
+
+        return positional_embeddings
 
 
     def make_src_key_padding_mask(self, src: Union[dict, torch.Tensor]) -> Union[dict, torch.Tensor]:
@@ -93,8 +120,10 @@ class Transformer(BaseTransformer):
         self.tgt_word_embedding = nn.Embedding(self.target_vocab_size, self.embedding_size)
 
         # Positional embeddings for source and target
-        self.src_pos_embedding = nn.Embedding(self.max_len, self.embedding_size)
-        self.tgt_pos_embedding = nn.Embedding(self.max_len, self.embedding_size)
+        self.seq_pos_embedding_layers = nn.ModuleDict({
+            "src_word_ids": nn.Embedding(self.max_len, self.embedding_size),
+            "tgt_word_ids": nn.Embedding(self.max_len, self.embedding_size)
+        })
 
         # Transformer model
         self.transformer = nn.Transformer(d_model=self.embedding_size,
@@ -113,10 +142,10 @@ class Transformer(BaseTransformer):
 
     def forward(self, src, tgt):
         # Get positional encodings
-        src_positional_embedding, tgt_positional_embedding = self.get_positional_word_embeddings(src, tgt)
+        positional_embeddings = self.get_sequential_positional_embedding({"src_word_ids": src, "tgt_word_ids": tgt})
 
-        src_embedded = self.dropout(self.src_word_embedding(src) + src_positional_embedding)
-        tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + tgt_positional_embedding)
+        src_embedded = self.dropout(self.src_word_embedding(src) + positional_embeddings["src_word_ids"])
+        tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + positional_embeddings["tgt_word_ids"])
 
         # So that the transformer knows where the padding is
         src_padding_mask = self.make_src_key_padding_mask(src)
