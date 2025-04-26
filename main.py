@@ -170,7 +170,7 @@ def main():
     print("Model trainer and tester created")
 
     # Train the model
-    print(f"TRAINING CONFIGURATION: {config.MODEL} | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS} | DROPOUT = {config.DROPOUT}")
+    print(f"TRAINING CONFIGURATION: MODEL = {config.MODEL} | FUSION TYPE = {config.FUSION_TYPE} | TOKENISATIONS = {config.TOKENISATIONS} | DROPOUT = {config.DROPOUT}")
     trainer.train(patience=3)
     print("Model trained")
 
