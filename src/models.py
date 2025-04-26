@@ -144,13 +144,14 @@ class AttentionFusion(nn.Module):
         self.multi_attention_layers = nn.ModuleDict({
             name: nn.MultiheadAttention(embed_dim=embedding_size, num_heads=num_heads, batch_first=True)
              for name in layer_names})
+        self.layer_names = layer_names
 
     def forward(self, srcs: dict[str, torch.tensor], type: str = "single"):
         attention_outputs = [] # Empty list to store attention outputs
         if type == "single":
             # Calculate attention between the base tokenisation and the other tokenisations
-            for _, encoded_output in srcs.items():
-                attention_output, _ = self.single_attention_layer(query=srcs["src_word_ids"], key=encoded_output, value=encoded_output)
+            for name in self.layer_names:
+                attention_output, _ = self.single_attention_layer(query=srcs["src_word_ids"], key=srcs[name], value=srcs[name])
                 attention_outputs.append(attention_output)
 
         elif type == "multi":
