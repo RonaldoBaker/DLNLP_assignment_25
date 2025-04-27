@@ -18,16 +18,17 @@ if project_root not in sys.path:
 from utils.config import config
 
 class TransformerTester:
-    def __init__(self, test_loader, model, device):
+    def __init__(self, test_loader, model, device, log_dir):
         self.test_loader = test_loader
         self.model = model
         self.device = device
         self.bertscore = load("bertscore")
         self.smoothie = SmoothingFunction().method4  # Use method4 for BLEU score smoothing
+        self.log_dir = log_dir
 
-    
+
     def load_model(self):
-        path = config.SAVE_FILEPATH + f"checkpoints/best_model.pth" 
+        path = os.path.join(self.log_dir, "best_model.pth")
 
         if not os.path.exists(path):
             raise FileNotFoundError(f"Checkpoint file not found at {path}")

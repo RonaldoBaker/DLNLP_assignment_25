@@ -16,7 +16,7 @@ from src.early_stopping import EarlyStopping
 from utils.config import config
 
 class TransformerTrainer:
-    def __init__(self, train_loader, val_loader, tgt_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device):
+    def __init__(self, train_loader, val_loader, tgt_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device, log_dir):
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.tgt_vocab_itos = tgt_vocab.get_itos()
@@ -36,8 +36,7 @@ class TransformerTrainer:
         self.best_val_loss = float("inf")
         self.best_val_bleu = float("-inf")
         self.smoothie = SmoothingFunction().method4 # Use method4 for BLEU score smoothing
-        self.best_model = None
-        self.last_model = None
+        self.log_dir = log_dir
 
 
     def save_checkpoint(self, mode: str):
@@ -48,16 +47,13 @@ class TransformerTrainer:
             - mode (str): The mode of the checkpoint, either "best" or "last".
             - path (str): The path to save the checkpoint. If empty, saves in the current directory.
         """
-        path = config.SAVE_FILEPATH + f"checkpoints/{mode}_model.pth"
+        path = os.path.join(self.log_dir, f"{mode}_model.pth")
 
         # Define checkpoint
         checkpoint = {
             "model": self.model.state_dict()
         }
-        if mode == "best":
-            self.best_model = checkpoint
-        elif mode == "last":
-            self.last_model = checkpoint
+
         torch.save(checkpoint, path)
 
 

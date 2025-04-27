@@ -165,9 +165,13 @@ def main():
     scheduler = ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=1)
     print("Loss function, optimiser and scheduler defined")
 
+    # Create logger - to create a new log directory for each run
+    log_directory = Logger.set_log_dir(config.MODEL, hyperparameters)
+    print(f"Log directory created: {log_directory}")
+
     # Define model trainer and tester
-    trainer = TransformerTrainer(train_loader, val_loader, tgt_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device)
-    tester = TransformerTester(test_loader, model, device)
+    trainer = TransformerTrainer(train_loader, val_loader, tgt_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device, log_directory)
+    tester = TransformerTester(test_loader, model, device, log_directory)
     print("Model trainer and tester created")
 
     # Train the model
@@ -181,6 +185,7 @@ def main():
 
     # Log information for this run
     logger = Logger(trainer, tester, hyperparameters, config.MODEL)
+    logger.log_dir = log_directory # set the log directory to the first one created
     logger.log_all()
     print("Model training and evaluation logged")
     print("DONE\n")
