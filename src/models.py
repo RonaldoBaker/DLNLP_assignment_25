@@ -22,38 +22,6 @@ class BaseTransformer(nn.Module):
         self.pad_index = pad_index
         self.max_len = max_len
         self.device = device
-
-
-    def get_positional_word_embeddings(self, src: Union[dict, torch.Tensor], tgt: torch.Tensor):
-        """
-        Get positional word embeddings for source and target sequences.
-        Args:
-            src: Source sequence (dict of different source tokenisations or tensor).
-            tgt: Target sequence (tensor).
-        Returns:
-            src_embeddings: Source embeddings with positional information from word tokenisations.
-            tgt_embeddings: Target embeddings with positional information from word tokenisations.
-        """
-        raise DeprecationWarning("This method is deprecated. Use get_sequential_positional_embedding instead.")
-
-        if isinstance(src, dict):
-            src = src["src_word_ids"]
-
-        N, src_seq_length = src.shape # batch size, source sequence length
-        N, tgt_seq_length = tgt.shape # batch size, target sequence length
-
-        # Get positional encodings using the word-level tokenisation
-        src_positions = torch.arange(0, src_seq_length).unsqueeze(0).expand(
-            N, src_seq_length).to(self.device)
-
-        tgt_positions = torch.arange(0, tgt_seq_length).unsqueeze(0).expand(
-            N, tgt_seq_length).to(self.device)
-
-        # Positional embeddings
-        src_positional_embedding = self.src_pos_embedding(src_positions)
-        tgt_positional_embedding = self.tgt_pos_embedding(tgt_positions)
-
-        return src_positional_embedding, tgt_positional_embedding
     
 
     def get_sequential_positional_embedding(self, sequences: dict[str, torch.tensor]):
@@ -125,10 +93,6 @@ class Transformer(BaseTransformer):
         self.tgt_word_embedding = nn.Embedding(self.target_vocab_size, self.embedding_size)
 
         # Positional embeddings for source and target
-        # self.seq_pos_embedding_layers = nn.ModuleDict({
-        #     "src_word_ids": nn.Embedding(self.max_len, self.embedding_size),
-        #     "tgt_word_ids": nn.Embedding(self.max_len, self.embedding_size)
-        # })
         self.seq_pos_embedding_layers = nn.ModuleList([
             nn.Embedding(self.max_len, self.embedding_size) for _ in range(2)])
 
