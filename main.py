@@ -60,8 +60,11 @@ hyperparameters = {
 # Set device
 if torch.cuda.is_available():
     device_num = config.GPU
-    torch.cuda.set_device(device_num)
-    device = torch.device(f"cuda:{device_num}")
+    if device_num == -1:
+        device = torch.device("cpu")
+    else:
+        torch.cuda.set_device(device_num)
+        device = torch.device(f"cuda:{device_num}")
 else:
     device = torch.device("cpu")
 print(f"Running on {device}")
