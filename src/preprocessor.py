@@ -159,7 +159,12 @@ class Preprocessor:
         src_syllable_tokens = [item for sublist in src_syllable_tokens for item in sublist][:max_length]
 
         # Character tokenisation
-        src_char_tokens = tokenisers["src_char_tokeniser"].tokenize(pair["src"])[:max_length]
+        """
+        Max length is set to max_length - 2 to account for the start and end of sentence tokens
+        because char tokens are more likely to exceed the max length and cutting it off at max length
+        would still result in a list that is too long
+        """
+        src_char_tokens = tokenisers["src_char_tokeniser"].tokenize(pair["src"])[:max_length-2]
 
         # Add the start of sentence and end of sentence tokens
         tokenisations = {
