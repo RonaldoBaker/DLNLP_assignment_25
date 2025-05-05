@@ -19,4 +19,7 @@ parser.add_argument("-FT", "--FUSION_TYPE", type=str, default="single", choices=
 parser.add_argument("-TKNS", "--TOKENISATIONS", nargs="+", type=str, default=["word"], choices=["word", "subword", "syllable", "char"], help="Tokenisation to use for the multisource transformer")
 parser.add_argument("-RU", "--REMOVE_UNDERSCORE", type=bool, default=True, help="Remove underscore from the subword tokenisation")
 
+# General
+parser.add_argument("--SAVE_DATA", type=bool, default=False, help="Save the preprocessed data to a JSON file")
+
 config = parser.parse_args()

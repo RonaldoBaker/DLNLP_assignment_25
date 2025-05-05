@@ -27,6 +27,7 @@ from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
 from utils.logger import Logger
 from utils.config import config
+import json
 
 # Define the hyperparameters
 random_seed = 7
@@ -102,6 +103,12 @@ def main():
     # Convert the tokenised data to indices
     indexed_dictionaries = Preprocessor.numericalise(tokenised_dictionaries, vocabularies)
     print("Dictionaries indexed")
+
+    # Save the preprocessed data
+    if config.SAVE_DATA:
+        with open(os.path.join(config.SAVE_PATH, "data", "indexed_dictionaries.json"), "w") as f:
+            json.dump(indexed_dictionaries, f, indent=4)
+        print("Indexed dictionaries saved to 'indexed_dictionaries.json'")
 
     # Create the custom dataset
     if config.MODEL == "single":
