@@ -4,6 +4,8 @@ such as file reading, tokenisation, vocabulary creation, etc.
 """
 
 # Import necessary libraries
+import os
+import sys
 import json
 import string
 import spacy
@@ -17,6 +19,14 @@ nltk.download("words")
 from nltk.tokenize.legality_principle import LegalitySyllableTokenizer
 from nltk.tokenize.simple import CharTokenizer
 from nltk.corpus import words
+from tqdm import tqdm
+
+# Append project root to sys.path
+project_root = os.path.join(os.path.dirname(__file__), "..")
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from src.lattice import Lattice
 
 class Preprocessor:
     """
@@ -47,7 +57,7 @@ class Preprocessor:
         with open(file=path, mode="r", encoding="utf-8") as file:
             content = file.readlines()
         return content
-    
+
 
     @staticmethod
     def create_parallel_data(text: list[str], format: str, save: bool = False
@@ -128,6 +138,7 @@ class Preprocessor:
                       tokenisers: dict,
                       sos_token: str,
                       eos_token: str,
+                      remove_underscore: bool,
                       max_length: int = 100
                       ) -> dict[str, list[str]]:
         """
@@ -152,6 +163,9 @@ class Preprocessor:
 
         # Subword tokenisation
         src_subword_tokens = tokenisers["src_subword_tokeniser"].tokenize(pair["src"])[:max_length]
+        if remove_underscore:
+            src_subword_tokens = [token[1:] for token in src_subword_tokens if token.startswith("▁")]
+            src_subword_tokens = [token for token in src_subword_tokens if len(token) > 0] # Remove empty tokens
 
         # Syllable tokenisation
         src_syllable_tokens = [tokenisers["src_syllable_tokeniser"].tokenize(word_token) for word_token in src_word_tokens]
@@ -183,7 +197,7 @@ class Preprocessor:
 
 
     @staticmethod
-    def create_tokenised_dataset(translation_dictionary: dict[str, str]) -> list[dict[str, str]]:
+    def create_tokenised_dataset(translation_dictionary: dict[str, str], remove_underscore: bool = True) -> list[dict[str, str]]:
         """
         Wraps the __create tokens function into a lambda function
         and tokenises the parallel sentences in the given dictionary
@@ -212,7 +226,8 @@ class Preprocessor:
                       "src_char_tokeniser": src_char_tokeniser
                       }
 
-        return list(map(lambda x: Preprocessor.__create_tokens(x, tokenisers, sos_token="<sos>", eos_token="<eos>"), translation_dictionary))
+        return list(map(lambda x: Preprocessor.__create_tokens(x, tokenisers, sos_token="<sos>", eos_token="<eos>", remove_underscore=remove_underscore),
+                        tqdm(translation_dictionary, desc="Tokenising data", unit="dictionary", leave=True)))
 
 
     @staticmethod
@@ -281,4 +296,65 @@ class Preprocessor:
         Returns:
             - (list[dict]): The tokenised data as a list of dictionaries containing the indices
         """
-        return list(map(lambda x: Preprocessor.__token_to_index(x, vocabularies), tokenised_dictionaries))
+        return list(map(lambda x: Preprocessor.__token_to_index(x, vocabularies),
+                        tqdm(tokenised_dictionaries, desc="Numericalising tokenised data", unit="dictionary", leave=True)))
+    
+
+    @staticmethod
+    def __generate_lpes(dictionary: dict[str, str], fine_grain_tokenisation: str):
+        """
+        Generates the lattice positional encodings for the given dictionary.
+
+        Arg(s):
+            - dictionary (dict[str, str]): The dictionary containing the tokenised data
+            - device (str): The device to use for the tensors
+            - fine_grain_tokenisation (str): The fine-grain tokenisation to use
+
+        Returns:
+            - (dict[str, torch.Tensor]): The dictionary containing the lattice positional encodings
+        """
+        # Create a lattice object - creates the lattice inherently
+        lattice = Lattice(dictionary["src_word_tokens"], dictionary["src_" + fine_grain_tokenisation + "_tokens"], type=fine_grain_tokenisation)
+
+        if lattice.graph is None: # Threw an error, tokenisations cannot be aligned
+            lpes_to_add = {
+                "src_word_lpes": None,
+            }
+
+            dictionary.update(lpes_to_add)
+
+            return dictionary
+
+        else:
+            # Get the positional encodings for the word and fine-grain tokens
+            word_lpes, fine_grain_lpes = lattice.get_lattice_positional_encodings()
+
+            # Add the positional encodings to the dictionary
+            lpes_to_add = {
+                "src_word_lpes": word_lpes,
+                "src_" + fine_grain_tokenisation + "_lpes": fine_grain_lpes
+            }
+
+            # Update the dictionary with the lattice positional encodings
+            dictionary.update(lpes_to_add)
+
+            return dictionary
+
+
+    @staticmethod
+    def lattice_building(dictionaries: list[dict[str, str]], fine_grain_tokenisation = str) -> list[dict]:
+        """
+        Creates the lattice positional encodings for the given dictionaries.
+
+        Args:
+            - dictionaries (list[dict[str, str]]): The dictionaries containing the tokenised data
+            - device (str): The device to use for the tensors
+
+        Returns:
+            - (list[dict[str, torch.Tensor]]): The dictionaries containing the lattice positional encodings
+        """
+        lattice_dicts = list(map(lambda x: Preprocessor.__generate_lpes(x, fine_grain_tokenisation),
+                        tqdm(dictionaries, desc="Generating lattice positional encodings", unit="dictionary", leave=True)))
+        
+        # Discard any dictionaries where tokenisations could not be aligned
+        return [dictionary for dictionary in lattice_dicts if dictionary["src_word_lpes"] is not None]      
