@@ -110,12 +110,16 @@ def main():
             json.dump(indexed_dictionaries, f, indent=4)
         print("Indexed dictionaries saved to 'indexed_dictionaries.json'")
 
+    if config.FUSION_TYPE == "lattice":
+        indexed_dictionaries = Preprocessor.lattice_building(indexed_dictionaries, [token for token in config.TOKENISATIONS if token != "word"][0])
+        print("Lattice dictionaries created")
+
     # Create the custom dataset
     if config.MODEL == "single":
         token_dataset = TokenDataset(indexed_dictionaries, src_vocab, tgt_vocab, device)
     elif config.MODEL == "multi":
         chosen_tokenisations = ["src_" + tokenisation + "_ids" for tokenisation in config.TOKENISATIONS]
-        token_dataset = MultiTokenDataset(indexed_dictionaries, chosen_tokenisations, device)
+        token_dataset = MultiTokenDataset(indexed_dictionaries, chosen_tokenisations, device, fusion_type=config.FUSION_TYPE)
     print("Custom dataset created")
 
     # Split the data into train, validation and test sets
@@ -126,13 +130,13 @@ def main():
     if config.MODEL == "single":
         wrapped_collate_fn = partial(collate_fn, source_vocab=src_vocab, target_vocab=tgt_vocab)
     elif config.MODEL == "multi":
-        wrapped_collate_fn = partial(collate_fn_multitokenisation, source_vocab=src_vocab, target_vocab=tgt_vocab)
+        wrapped_collate_fn = partial(collate_fn_multitokenisation, source_vocab=src_vocab, target_vocab=tgt_vocab, embedding_size=embedding_size)
 
     # Create the data loaders
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=wrapped_collate_fn)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=wrapped_collate_fn)
-    print("Dataloader created")
+    print("Dataloaders created")
 
     # MODEL TRAINING
     # Define pad index

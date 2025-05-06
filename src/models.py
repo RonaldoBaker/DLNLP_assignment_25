@@ -1,7 +1,6 @@
 from typing import Union
 import torch 
 import torch.nn as nn
-import sys
 
 class BaseTransformer(nn.Module):
     def __init__(self,
@@ -145,12 +144,24 @@ class AttentionFusion(nn.Module):
              for name in layer_names})
         self.layer_names = layer_names
 
-    def forward(self, srcs: dict[str, torch.tensor], type: str = "single"):
+    def forward(self, srcs: dict[str, torch.tensor], type: str = "single", lpes: dict[str, torch.tensor] = None):
         attention_outputs = [] # Empty list to store attention outputs
-        if type == "single":
+        if type == "single" or type == "lattice":
             # Calculate attention between the base tokenisation and the other tokenisations
             for name in self.layer_names:
-                attention_output, _ = self.single_attention_layer(query=srcs["src_word_ids"], key=srcs[name], value=srcs[name])
+                query = srcs["src_word_ids"]
+                key = srcs[name]
+                value = srcs[name]
+
+                # Lattice Positional Encodings
+                if type == "lattice":
+                    assert lpes is not None, "Lattice positional encodings are required for lattice fusion"
+                    # Add the lattice positional encodings to the query, key and value
+                    query = srcs["src_word_ids"] + lpes["src_word_lpes"]
+                    key = srcs[name] + lpes[name.replace("ids", "lpes")]
+                    value = srcs[name] + lpes[name.replace("ids", "lpes")]
+
+                attention_output, _ = self.single_attention_layer(query=query, key=key, value=value)
                 attention_outputs.append(attention_output)
 
         elif type == "multi":
@@ -224,13 +235,19 @@ class MultiSourceTransformer(BaseTransformer):
 
 
     def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
-        # # Get positional encodings
-        sequences = srcs.copy()
-        sequences.update({"tgt_word_ids": tgt})
-        positional_embeddings = self.get_sequential_positional_embedding(sequences)
+
+        # Separate the lattice positional encodings from the source tokenisations
+        src_lpes = None
+        if self.fusion_type == "lattice":
+            src_lpes = {key: srcs[key] for key in srcs.keys() if key.endswith("_lpes")}
+        src_sequences = {key: srcs[key] for key in srcs.keys() if not key.endswith("_lpes")}
+        src_sequences.update({"tgt_word_ids": tgt})
+
+        # Get positional encodings for the source and target sequences
+        positional_embeddings = self.get_sequential_positional_embedding(src_sequences)
 
         # Get the embeddings for source tokenisations and target tokenisation
-        embeddings = {tokenisation: self.embedding_layers[tokenisation](tensor) for tokenisation, tensor in sequences.items()}
+        embeddings = {tokenisation: self.embedding_layers[tokenisation](tensor) for tokenisation, tensor in src_sequences.items()}
 
         # Add positional embeddings to the source and target embedding and apply dropout
         embeddings = {tokenisation: self.dropout(embedding + positional_embeddings[tokenisation]) for tokenisation, embedding in embeddings.items()}
@@ -250,7 +267,7 @@ class MultiSourceTransformer(BaseTransformer):
 
         # Attention-based fusion if there is more than one tokenisation method,
         # if not return the regular encoder output for word tokenisation
-        fused_output = encoded_outputs["src_word_ids"] if len(encoded_outputs) == 1 else self.fuser(encoded_outputs, self.fusion_type)
+        fused_output = encoded_outputs["src_word_ids"] if len(encoded_outputs) == 1 else self.fuser(encoded_outputs, self.fusion_type, src_lpes)
 
         # Decoder forward pass
         tgt_key_padding_mask = self.make_tgt_key_padding_mask(tgt)

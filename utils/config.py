@@ -15,7 +15,7 @@ parser.add_argument("--MODEL", type=str, default="single", choices=["single", "m
 parser.add_argument("-D", "--DROPOUT", type=float, default=0.2, help="Dropout rate")
 
 # for multisource_main.py
-parser.add_argument("-FT", "--FUSION_TYPE", type=str, default="single", choices=["single", "multi"], help="Fusion type for multisource transformer")
+parser.add_argument("-FT", "--FUSION_TYPE", type=str, default="single", choices=["single", "multi", "lattice"], help="Fusion type for multisource transformer")
 parser.add_argument("-TKNS", "--TOKENISATIONS", nargs="+", type=str, default=["word"], choices=["word", "subword", "syllable", "char"], help="Tokenisation to use for the multisource transformer")
 parser.add_argument("-RU", "--REMOVE_UNDERSCORE", type=bool, default=True, help="Remove underscore from the subword tokenisation")
 
