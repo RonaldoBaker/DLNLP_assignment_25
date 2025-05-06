@@ -23,7 +23,7 @@ class BaseTransformer(nn.Module):
         self.device = device
     
 
-    def get_sequential_positional_embedding(self, sequences: dict[str, torch.tensor]):
+    def get_positional_embedding(self, sequences: dict[str, torch.tensor], type: str = "sequential"):
         """
         Get positional word embeddings for source and target sequences.
         Args:
@@ -33,23 +33,66 @@ class BaseTransformer(nn.Module):
             src_embeddings: Source embeddings with positional information from word tokenisations.
             tgt_embeddings: Target embeddings with positional information from word tokenisations.
         """
-        # Check that the number of input sequences is equal to the number of positional embedding layers
-        assert len(sequences) == len(self.seq_pos_embedding_layers), \
-            f"Number of input sequences ({len(sequences)}) does not match the number of positional embedding layers ({len(self.seq_pos_embedding_layers)})"
-        
         positional_embeddings = {}
 
-        for i, (tokenisation, sequence) in enumerate(sequences.items()):
-            # Batch size and sequence length
-            N, seq_length = sequence.shape
+        if type == "sequential":
+        # Check that the number of input sequences is equal to the number of positional embedding layers
+            assert len(sequences) == len(self.seq_pos_embedding_layers), \
+                f"Number of input sequences ({len(sequences)}) does not match the number of positional embedding layers ({len(self.seq_pos_embedding_layers)})"
+            
+            for i, (tokenisation, sequence) in enumerate(sequences.items()):
+                # Batch size and sequence length
+                N, seq_length = sequence.shape
 
-            # Using a simple sequential positional encoding
-            positions = torch.arange(0, seq_length).unsqueeze(0).expand(N, seq_length).to(self.device)
+                # Using a simple sequential positional encoding
+                positions = torch.arange(0, seq_length).unsqueeze(0).expand(N, seq_length).to(self.device)
 
-            # Get positional embeddings using the tokenisation key
-            positional_embeddings[tokenisation] = self.seq_pos_embedding_layers[i](positions)
+                # Get positional embeddings using the tokenisation key
+                positional_embeddings[tokenisation] = self.seq_pos_embedding_layers[i](positions)
+        
+        elif type == "sinusoidal":
+
+            for i, (tokenisation, sequence) in enumerate(sequences.items()):
+                # Batch size and sequence length
+                N, seq_length = sequence.shape
+
+                # Using a simple sequential positional encoding
+                positions = torch.arange(0, seq_length, dtype=torch.float32, device=self.device).unsqueeze(1)
+                div_term = torch.exp(torch.arange(0, self.embedding_size, 2, dtype=torch.float32, device=self.device)
+                                    * -(torch.log(torch.tensor(10000.0, device=self.device)) / self.embedding_size))
+                pe = torch.zeros(seq_length, self.embedding_size, device=self.device)
+                pe[:, 0::2] = torch.sin(positions * div_term)
+                pe[:, 1::2] = torch.cos(positions * div_term)
+                pe = pe.unsqueeze(0).expand(N, seq_length, self.embedding_size)
+                positional_embeddings[tokenisation] = pe
+
+        else:
+            raise ValueError("Invalid positional embedding type. Choose 'sequential' or 'sinusoidal'.")
 
         return positional_embeddings
+
+
+    # def get_sinusoidal_positional_embedding(self, sequences: dict[str, torch.tensor]):
+    #     """
+    #     Get sinusoidal positional word embeddings for source and target sequences.
+    #     """
+    #     positional_embeddings = {}
+
+    #     for i, (tokenisation, sequence) in enumerate(sequences.items()):
+    #         # Batch size and sequence length
+    #         N, seq_length = sequence.shape
+
+    #         # Using a simple sequential positional encoding
+    #         positions = torch.arange(0, seq_length, dtype=torch.float32, device=self.device).unsqueeze(1)
+    #         div_term = torch.exp(torch.arange(0, self.embedding_size, 2, dtype=torch.float32, device=self.device)
+    #                               * -(torch.log(torch.tensor(10000.0, device=self.device)) / self.embedding_size))
+    #         pe = torch.zeros(seq_length, self.embedding_size, device=self.device)
+    #         pe[:, 0::2] = torch.sin(positions * div_term)
+    #         pe[:, 1::2] = torch.cos(positions * div_term)
+    #         pe = pe.unsqueeze(0).expand(N, seq_length, self.embedding_size)
+    #         positional_embeddings[tokenisation] = pe
+
+    #     return positional_embeddings
 
 
     def make_src_key_padding_mask(self, src: Union[dict, torch.Tensor]) -> Union[dict, torch.Tensor]:
@@ -112,7 +155,7 @@ class Transformer(BaseTransformer):
 
     def forward(self, src, tgt):
         # Get positional encodings
-        positional_embeddings = self.get_sequential_positional_embedding({"src_word_ids": src, "tgt_word_ids": tgt})
+        positional_embeddings = self.get_positional_embedding({"src_word_ids": src, "tgt_word_ids": tgt})
 
         src_embedded = self.dropout(self.src_word_embedding(src) + positional_embeddings["src_word_ids"])
         tgt_embedded = self.dropout(self.tgt_word_embedding(tgt) + positional_embeddings["tgt_word_ids"])
@@ -187,11 +230,15 @@ class MultiSourceTransformer(BaseTransformer):
                  pad_index: int,
                  max_len: int,
                  device: str,
-                 fusion_type: str):
+                 fusion_type: str,
+                 pe_type: str = "sequential",
+                 additional_positional_embedding: bool = True):
         super().__init__(embedding_size, num_heads, num_encoder_layers, num_decoder_layers, dropout, pad_index, max_len, device)
         self.vocab_sizes = vocab_sizes
         self.num_sources = len(vocab_sizes)
         self.fusion_type = fusion_type
+        self.pe_type = pe_type
+        self.additional_positional_embedding = additional_positional_embedding
 
         # Create embeddings and encoders dynamically
         self.seq_pos_embedding_layers = nn.ModuleList([
@@ -243,14 +290,21 @@ class MultiSourceTransformer(BaseTransformer):
         src_sequences = {key: srcs[key] for key in srcs.keys() if not key.endswith("_lpes")}
         src_sequences.update({"tgt_word_ids": tgt})
 
-        # Get positional encodings for the source and target sequences
-        positional_embeddings = self.get_sequential_positional_embedding(src_sequences)
-
+        if self.additional_positional_embedding:
+            positional_embeddings = self.get_positional_embedding(src_sequences, self.pe_type)
+        else:
+            # Just adding a positional encoding to the word tokens
+            src_word_sequences = {key: srcs[key] for key in srcs.keys() if key == "src_word_ids"}
+            positional_embeddings = self.get_positional_embedding(src_word_sequences, self.pe_type)
+        
         # Get the embeddings for source tokenisations and target tokenisation
         embeddings = {tokenisation: self.embedding_layers[tokenisation](tensor) for tokenisation, tensor in src_sequences.items()}
 
         # Add positional embeddings to the source and target embedding and apply dropout
-        embeddings = {tokenisation: self.dropout(embedding + positional_embeddings[tokenisation]) for tokenisation, embedding in embeddings.items()}
+        # If there is no corresponding positional embedding, just add 0
+        embeddings = {
+            tokenisation: self.dropout(embedding + positional_embeddings.get(tokenisation, 0)) for tokenisation, embedding in embeddings.items()
+        }
 
         # Make source key padding masks
         src_key_padding_masks = self.make_src_key_padding_mask(srcs)

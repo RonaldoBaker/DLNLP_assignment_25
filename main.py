@@ -44,6 +44,9 @@ lr = 0.0001
 # Define parameter dictionary for logging
 hyperparameters = {
     "fusion_type": config.FUSION_TYPE,
+    "position_embedding_type": config.POSITIONAL_EMBEDDING_TYPE,
+    "remove_underscore": config.REMOVE_UNDERSCORE,
+    "additional_positional_embedding": config.ADDITIONAL_PE,
     "tokenisations": config.TOKENISATIONS,
     "model": config.MODEL,
     "random_seed": random_seed,
@@ -170,7 +173,10 @@ def main():
                                        pad_index=pad_index,
                                        max_len=max_len,
                                        device=device,
-                                       fusion_type=config.FUSION_TYPE).to(device)
+                                       fusion_type=config.FUSION_TYPE,
+                                       pe_type=config.POSITIONAL_EMBEDDING_TYPE,
+                                       additional_positional_embedding=config.ADDITIONAL_PE,
+                                       ).to(device)
     print("Model created")
 
     # Define the loss function, optimiser and scheduler
