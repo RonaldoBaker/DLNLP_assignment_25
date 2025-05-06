@@ -15,8 +15,6 @@ project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from utils.config import config
-
 class TransformerTester:
     def __init__(self, test_loader, model, device, log_dir):
         self.test_loader = test_loader
@@ -247,17 +245,33 @@ class TransformerTester:
                     raise ValueError("Invalid decoding type. Use 'greedy' or 'beam'.")
 
         with tqdm(total=4, desc="Calculating Metrics", leave=True, unit="metric") as pbar:
-            bleu = corpus_bleu(references, candidates, smoothing_function=self.smoothie)
+            try:
+                bleu = corpus_bleu(references, candidates, smoothing_function=self.smoothie)
+                pbar.update(1)
+            except Exception:
+                bleu = 0.0
+                print("Error calculating BLEU score. Setting BLEU score to 0.")
+
+            try:
+                precision, recall, f1 = self.calculate_bertscore(references, candidates)
+                pbar.update(1)
+            except Exception:
+                precision, recall, f1 = 0.0, 0.0, 0.0
+                print("Error calculating BERTScore. Setting precision, recall, and F1 to 0.")
+
+            try:
+                ref_oov_rate, pred_oov_rate = self.calculate_oov_rates(
+                    {"train_set_vocab": train_set, "test_set_vocab": test_set, "output_model_vocab": candidates_ids})
+            except ZeroDivisionError:
+                ref_oov_rate, pred_oov_rate = 0.0, 0.0
+                print("Error calculating OOV rates. Setting reference and prediction OOV rates to 0.")
             pbar.update(1)
 
-            precision, recall, f1 = self.calculate_bertscore(references, candidates)
-            pbar.update(1)
-
-            ref_oov_rate, pred_oov_rate = self.calculate_oov_rates(
-                {"train_set_vocab": train_set, "test_set_vocab": test_set, "output_model_vocab": candidates_ids})
-            pbar.update(1)
-
-            unk_rate = self.calculate_unknown_rate(candidates)
+            try:
+                unk_rate = self.calculate_unknown_rate(candidates)
+            except ZeroDivisionError:
+                unk_rate = 0.0
+                print("Error calculating unknown rate. Setting unknown rate to 0.")
             pbar.update(1)
 
         # Create a dictionary to store the results and access from the logger
