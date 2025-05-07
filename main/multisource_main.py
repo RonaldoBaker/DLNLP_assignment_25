@@ -21,7 +21,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from src.preprocessor import Preprocessor
-from src.custom_dataset import MultiTokenDataset, collate_fn_multitokenisation
+from dataset import MultiTokenDataset, collate_fn_multitokenisation
 from src.models import MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
