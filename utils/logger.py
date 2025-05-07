@@ -114,13 +114,6 @@ class Logger:
             json.dump(self.tester.results, f, indent=4)
 
 
-    def log_model_weights(self):
-        best_model_checkpoint = self.trainer.best_model
-        last_model_checkpoint = self.trainer.last_model
-        torch.save(best_model_checkpoint, os.path.join(self.log_dir, "best_model.pth"))
-        torch.save(last_model_checkpoint, os.path.join(self.log_dir, "last_model.pth"))
-
-
     def log_all(self):
         """
         Logs all the information to the log directory.
@@ -128,4 +121,3 @@ class Logger:
         self.log_hyperparameters()
         self.log_and_plot_training_metrics()
         self.log_test_results()
-        self.log_model_weights()
