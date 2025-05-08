@@ -47,7 +47,6 @@ from src.model_tester import TransformerTester
 from utils.logger import Logger
 from utils.config import config
 
-
 # Define the hyperparameters
 random_seed = 7
 embedding_size = 512
@@ -79,6 +78,12 @@ hyperparameters = {
     "epochs": epochs,
     "lr": lr,
 }
+
+# Check if config.LOG_PATH exists
+if not os.path.exists(config.LOG_PATH):
+    config.LOG_PATH = os.path.join(project_root, "logs")
+    os.makedirs(config.LOG_PATH, exist_ok=True)
+    print(f"LOG_PATH does not exist. Setting LOG_PATH to: {config.LOG_PATH}")
 
 # Set device
 if torch.cuda.is_available():
