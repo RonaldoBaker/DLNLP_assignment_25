@@ -34,7 +34,7 @@ import warnings
 warnings.filterwarnings("ignore", message="The PyTorch API of nested tensors is in prototype stage") 
 
 # Append project root to sys.path
-project_root = os.path.join(os.path.dirname(__file__), "..")
+project_root = os.path.join(os.path.dirname(__file__))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
@@ -46,7 +46,6 @@ from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
 from utils.logger import Logger
 from utils.config import config
-
 # Define the hyperparameters
 random_seed = 7
 embedding_size = 512
