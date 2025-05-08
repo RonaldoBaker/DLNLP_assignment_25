@@ -32,7 +32,38 @@ For a complete list of dependencies, refer to the [`env/requirements.txt`](env/r
 Follow these steps to set up the environment and run the project:
 
 ### 1. Create a Virtual Environment
-Run the following commands to create and activate a virtual environment:
+Run the following commands to create and activate a virtual environment, and run the setup script to download other necessay dependencies:
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+conda env create -f env/environment.yml
+conda activate nlp
+```
+
+### 2. Run shell script
+Run the following commands to download other necessary dependencies:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+## Running main.py
+The `main.py` runs with a number of CLI arguments. By default it will have the following arguments:
+
+1. `GPU=0`
+2. `MODEL='single'`
+3. `DROPOUT=0.2`
+4. `POSITIONAL_EMBEDDING_TYPE='sequential'`
+5. `FUSION_TYPE='single'`
+6. `TOKENISATIONS=['word']`
+7. `REMOVE_UNDERSCORE=True`
+8. `ADDITIONAL_POSITIONAL_EMBEDDING=True`
+
+The default `LOG_PATH` should be change to folder on your local device. If it is not found, it will automatically store in the root of the repository and create a folder called `logs/`
+
+Here is an example of running `main.py` with some arguments:
+
+```bash
+python main.py --GPU 0 --MODEL single --TOKENISATIONS word subword --FUSION_TYPE single --DROPOOUT 0.2
+```
+
+Please refer to [utils/config.py](utils/config.py) for the full details of what is allowed for each arguments. 
+
