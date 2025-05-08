@@ -23,11 +23,15 @@ class Logger:
     """
     Logger class for logging hyperparameters, training metrics, and test results.
     """
-    def __init__(self, trainer, tester, hyperparameters, inner_log_dir: str = "base"):
+    def __init__(self, trainer, tester, hyperparameters: dict, log_dir: str = None, inner_log_dir: str = "single"):
         self.trainer = trainer
         self.tester = tester
         self.hyperparameters = hyperparameters
-        self.log_dir = Logger.set_log_dir(inner_log_dir, hyperparameters)
+        # If the log directory has already been set, use it
+        if log_dir is None:
+            self.log_dir = Logger.set_log_dir(inner_log_dir, hyperparameters)
+        else:
+            self.log_dir = log_dir
 
 
     @staticmethod

@@ -40,7 +40,7 @@ if project_root not in sys.path:
 
 # Import custom modules
 from src.preprocessor import Preprocessor
-from dataset import TokenDataset, MultiTokenDataset, collate_fn, collate_fn_multitokenisation
+from src.dataset import TokenDataset, MultiTokenDataset, collate_fn, collate_fn_multitokenisation
 from src.models import Transformer, MultiSourceTransformer
 from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
@@ -224,8 +224,8 @@ def main():
     print("Model evaluated")
 
     # Log information for this run
-    logger = Logger(trainer, tester, hyperparameters, config.MODEL)
-    logger.log_dir = log_directory # set the log directory to the first one created
+    logger = Logger(trainer, tester, hyperparameters, log_directory, config.MODEL)
+    # logger.log_dir = log_directory # set the log directory to the first one created
     logger.log_all()
     print("Model training and evaluation logged")
     print("DONE\n")
