@@ -48,7 +48,7 @@ class Logger:
         """
         # Get current date and time
         now = datetime.datetime.now()
-        timestamp_str = now.strftime("%Y.%m.%d_%H:%M:%S")
+        timestamp_str = now.strftime("%Y.%m.%d_%H-%M-%S")
 
         # Add tokenisation to the log directory name
         tokenisations = "_".join(hyperparameters["tokenisations"])
