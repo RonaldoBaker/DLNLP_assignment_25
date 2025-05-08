@@ -1,3 +1,6 @@
+"""
+This module contains the TransformerTrainer class, which is responsible for training and validating a Transformer model.
+"""
 import os
 import sys
 import time
@@ -12,9 +15,13 @@ project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+# Import custom modules
 from src.early_stopping import EarlyStopping
 
 class TransformerTrainer:
+    """
+    A class to train and validate a Transformer model.
+    """
     def __init__(self, train_loader, val_loader, tgt_vocab, max_len, epochs, optimiser, scheduler, loss_func, model, device, log_dir):
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -28,6 +35,7 @@ class TransformerTrainer:
         self.loss_func = loss_func
         self.model = model
         self.device = device
+
         # Store the losses while training to plot loss curves
         self.train_losses = []
         self.val_losses = []
@@ -42,9 +50,9 @@ class TransformerTrainer:
         """
         Saves the model checkpoint.
 
-        Arg(s):
-            - mode (str): The mode of the checkpoint, either "best" or "last".
-            - path (str): The path to save the checkpoint. If empty, saves in the current directory.
+        Args:
+            mode (str): The mode of the checkpoint, either "best" or "last".
+            path (str): The path to save the checkpoint. If empty, saves in the current directory.
         """
         path = os.path.join(self.log_dir, f"{mode}_model.pth")
 
@@ -56,7 +64,16 @@ class TransformerTrainer:
         torch.save(checkpoint, path)
 
 
-    def calculate_validation_bleu_score(self, src, tgt):
+    def calculate_validation_bleu_score(self, src: torch.Tensor, tgt: torch.Tensor) -> float:
+        """
+        Calculate the BLEU score for the validation set.
+        Args:
+            src (torch.Tensor): The source sequences.
+            tgt (torch.Tensor): The target sequences.
+
+        Returns:
+            float: The BLEU score.
+        """
         # Get batch size
         batch_size = tgt.size(0)
 
@@ -105,6 +122,12 @@ class TransformerTrainer:
 
 
     def train(self, patience: int = 5, delta: int = 0):
+        """
+        Train the Transformer model.
+        Args:
+            patience (int): Number of epochs with no improvement after which training will be stopped.
+            delta (int): Minimum change in the monitored quantity to qualify as an improvement.
+        """
         # Define early stopping
         early_stopping = EarlyStopping(patience=patience, delta=delta, mode="max")
 
@@ -188,6 +211,12 @@ class TransformerTrainer:
 
 
     def plot_loss_curves(self, epoch_resolution: int, path: str):
+        """
+        Plot the training and validation loss curves.
+        Args:
+            epoch_resolution (int): The number of epochs to skip when plotting.
+            path (str): The path to save the plot. If empty, saves in the current directory.
+        """
         sampled_epochs = list(range(0, len(self.train_losses), epoch_resolution))
         sampled_train_losses = self.train_losses[::epoch_resolution]
         sampled_val_losses = self.val_losses[::epoch_resolution]

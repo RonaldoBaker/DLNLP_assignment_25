@@ -1,19 +1,28 @@
+"""
+This module contains the Logger class, which is responsible for logging
+hyperparameters, training metrics, and test results during the training and testing of a model.
+"""
+
+# Import necessary libraries
 import os
 import sys
 import json
 import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
-import torch
 
 # Append project root to sys.path
 project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+# Import custom modules
 from utils.config import config
 
 class Logger:
+    """
+    Logger class for logging hyperparameters, training metrics, and test results.
+    """
     def __init__(self, trainer, tester, hyperparameters, inner_log_dir: str = "base"):
         self.trainer = trainer
         self.tester = tester
@@ -22,7 +31,17 @@ class Logger:
 
 
     @staticmethod
-    def set_log_dir(inner_log_dir: str, hyperparameters: dict):
+    def set_log_dir(inner_log_dir: str, hyperparameters: dict) -> str:
+        """
+        Sets the log directory for the current run.
+
+        Args:
+            inner_log_dir (str) : The inner log directory name.
+            hyperparameters (dict) : The hyperparameters used for the current run.
+        
+        Returns:
+            str: The full path to the log directory.
+        """
         # Get current date and time
         now = datetime.datetime.now()
         timestamp_str = now.strftime("%Y.%m.%d_%H:%M:%S")
@@ -53,6 +72,9 @@ class Logger:
 
 
     def log_and_plot_training_metrics(self):
+        """
+        Logs the training metrics and plots the training and validation losses and BLEU scores.
+        """
         train_losses = self.trainer.train_losses
         val_losses = self.trainer.val_losses
         val_bleus = self.trainer.val_bleus
@@ -75,7 +97,14 @@ class Logger:
 
 
     def plot_losses(self, train_losses, val_losses, epochs):
+        """
+        Plots the training and validation losses.
 
+        Args:
+            train_losses (list) : List of training losses.
+            val_losses (list) : List of validation losses.
+            epochs (list) : List of epochs.
+        """
         plt.figure(figsize=(8, 5))
         plt.plot(epochs, train_losses, label="Training Loss")
         plt.plot(epochs, val_losses, label="Validation Loss")
@@ -88,7 +117,13 @@ class Logger:
 
 
     def plot_bleu(self, val_bleus, epochs):
-
+        """
+        Plots the validation BLEU scores.
+        
+        Args:
+            val_bleus (list) : List of validation BLEU scores.
+            epochs (list) : List of epochs.
+        """
         plt.figure(figsize=(8, 5))
         plt.plot(epochs, val_bleus, label="Validation BLEU")
         plt.grid()

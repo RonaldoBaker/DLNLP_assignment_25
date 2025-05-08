@@ -1,9 +1,8 @@
-import os
-import argparse
-
 """
 CLI arguments for the entire repo
 """
+
+import argparse
 
 parser = argparse.ArgumentParser(description="CLI arguments for the entire repo")
 

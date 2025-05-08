@@ -1,8 +1,14 @@
+"""
+This module contains the implementation of the Transformer model and its components.
+"""
 from typing import Union
 import torch 
 import torch.nn as nn
 
 class BaseTransformer(nn.Module):
+    """
+    Base class for the Transformer model.
+    """
     def __init__(self,
                  embedding_size: int,
                  num_heads: int,
@@ -23,15 +29,14 @@ class BaseTransformer(nn.Module):
         self.device = device
     
 
-    def get_positional_embedding(self, sequences: dict[str, torch.tensor], type: str = "sequential"):
+    def get_positional_embedding(self, sequences: dict[str, torch.tensor], type: str = "sequential") -> dict[str, torch.tensor]:
         """
         Get positional word embeddings for source and target sequences.
         Args:
-            src: Source sequence (dict of different source tokenisations or tensor).
-            tgt: Target sequence (tensor).
+            sequences (dict[str, torch.tensor]): Dictionary of sequences with tokenisation names as keys and tensors as values.
+            type (str): Type of positional embedding to use. Options are "sequential" or "sinusoidal".
         Returns:
-            src_embeddings: Source embeddings with positional information from word tokenisations.
-            tgt_embeddings: Target embeddings with positional information from word tokenisations.
+            dict[str, torch.tensor]: Dictionary of positional embeddings with tokenisation names as keys and tensors as values.
         """
         positional_embeddings = {}
 
@@ -72,30 +77,17 @@ class BaseTransformer(nn.Module):
         return positional_embeddings
 
 
-    # def get_sinusoidal_positional_embedding(self, sequences: dict[str, torch.tensor]):
-    #     """
-    #     Get sinusoidal positional word embeddings for source and target sequences.
-    #     """
-    #     positional_embeddings = {}
-
-    #     for i, (tokenisation, sequence) in enumerate(sequences.items()):
-    #         # Batch size and sequence length
-    #         N, seq_length = sequence.shape
-
-    #         # Using a simple sequential positional encoding
-    #         positions = torch.arange(0, seq_length, dtype=torch.float32, device=self.device).unsqueeze(1)
-    #         div_term = torch.exp(torch.arange(0, self.embedding_size, 2, dtype=torch.float32, device=self.device)
-    #                               * -(torch.log(torch.tensor(10000.0, device=self.device)) / self.embedding_size))
-    #         pe = torch.zeros(seq_length, self.embedding_size, device=self.device)
-    #         pe[:, 0::2] = torch.sin(positions * div_term)
-    #         pe[:, 1::2] = torch.cos(positions * div_term)
-    #         pe = pe.unsqueeze(0).expand(N, seq_length, self.embedding_size)
-    #         positional_embeddings[tokenisation] = pe
-
-    #     return positional_embeddings
-
-
     def make_src_key_padding_mask(self, src: Union[dict, torch.Tensor]) -> Union[dict, torch.Tensor]:
+        """
+        Create a key padding mask for the source sequences.
+        Args:
+            src (Union[dict, torch.Tensor]): Source sequences.
+                If a dictionary, it should contain tokenisation names as keys and tensors as values.
+
+        Returns:
+            Union[dict, torch.Tensor]: Key padding mask for the source sequences.
+            If a dictionary, it will contain tokenisation names as keys and masks as values.
+        """
         if isinstance(src, dict):
             masks = {}
             for tokenisation, tensor in src.items():
@@ -108,13 +100,23 @@ class BaseTransformer(nn.Module):
             return mask
 
 
-    def make_tgt_key_padding_mask(self, tgt):
+    def make_tgt_key_padding_mask(self, tgt: torch.Tensor) -> torch.Tensor:
+        """
+        Create a key padding mask for the target sequences.
+        Args:
+            tgt (torch.Tensor): Target sequences.
+        Returns:
+            torch.Tensor: Key padding mask for the target sequences.
+        """
         # tgt shape (batch size, tgt_seq_length)
         mask = tgt == self.pad_index
         return mask
 
 
 class Transformer(BaseTransformer):
+    """
+    Baseline single-source Transformer model.
+    """
     def __init__(self,
                  source_vocab_size: int,
                  target_vocab_size: int,
@@ -153,7 +155,16 @@ class Transformer(BaseTransformer):
         self.device = self.device
 
 
-    def forward(self, src, tgt):
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the Transformer model.
+        Args:
+            src (torch.Tensor): Source sequences.
+            tgt (torch.Tensor): Target sequences.
+
+        Returns:
+            torch.Tensor: Output of the Transformer model.
+        """
         # Get positional encodings
         positional_embeddings = self.get_positional_embedding({"src_word_ids": src, "tgt_word_ids": tgt})
 
@@ -178,8 +189,12 @@ class Transformer(BaseTransformer):
 
 
 class AttentionFusion(nn.Module):
+    """
+    Attention-based fusion layer for multiple tokenisation methods.
+    """
     def __init__(self, embedding_size: int, num_heads: int, layer_names: list[str]):
         super(AttentionFusion, self).__init__()
+        # Initialize the attention layers
         self.single_attention_layer = nn.MultiheadAttention(embed_dim=embedding_size, num_heads=num_heads, batch_first=True)
 
         self.multi_attention_layers = nn.ModuleDict({
@@ -187,7 +202,16 @@ class AttentionFusion(nn.Module):
              for name in layer_names})
         self.layer_names = layer_names
 
-    def forward(self, srcs: dict[str, torch.tensor], type: str = "single", lpes: dict[str, torch.tensor] = None):
+    def forward(self, srcs: dict[str, torch.tensor], type: str = "single", lpes: dict[str, torch.tensor] = None) -> torch.tensor:
+        """
+        Forward pass for the attention fusion layer.
+        Args:
+            srcs (dict[str, torch.tensor]): Dictionary of source sequences with tokenisation names as keys and tensors as values.
+            type (str): Type of attention fusion to use. Options are "single", "multi" or "lattice".
+            lpes (dict[str, torch.tensor]): Dictionary of lattice positional encodings with tokenisation names as keys and tensors as values.
+        Returns:
+            torch.Tensor: Fused output of the attention fusion layer.
+        """
         attention_outputs = [] # Empty list to store attention outputs
         if type == "single" or type == "lattice":
             # Calculate attention between the base tokenisation and the other tokenisations
@@ -209,7 +233,8 @@ class AttentionFusion(nn.Module):
 
         elif type == "multi":
             for tokenisation in self.multi_attention_layers.keys():
-                attention_output, _ = self.multi_attention_layers[tokenisation](query=srcs["src_word_ids"], key=srcs[tokenisation], value=srcs[tokenisation])
+                attention_output, _ = self.multi_attention_layers[tokenisation](query=srcs["src_word_ids"],
+                                                                                key=srcs[tokenisation], value=srcs[tokenisation])
                 attention_outputs.append(attention_output)
 
         else:
@@ -221,6 +246,10 @@ class AttentionFusion(nn.Module):
 
 
 class MultiSourceTransformer(BaseTransformer):
+    """
+    Multi-source Transformer model for multiple tokenisation methods.
+    This model uses attention-based fusion to combine the outputs of multiple encoders.
+    """
     def __init__(self, vocab_sizes: dict[str, int],
                  embedding_size: int,
                  num_heads: int,
@@ -244,19 +273,21 @@ class MultiSourceTransformer(BaseTransformer):
         self.seq_pos_embedding_layers = nn.ModuleList([
             nn.Embedding(max_len, embedding_size) for _ in range(self.num_sources)]) # Positional embeddings for each tokenisation
     
+        # Embedding layers for each tokenisation
         self.embedding_layers = nn.ModuleDict(
-            {tokenisation: nn.Embedding(vocab_size, self.embedding_size) for tokenisation, vocab_size in self.vocab_sizes.items()}) # Embedding layers for each tokenisation
+            {tokenisation: nn.Embedding(vocab_size, self.embedding_size) for tokenisation, vocab_size in self.vocab_sizes.items()}) 
+        
 
         self.encoders = nn.ModuleList([
             nn.TransformerEncoder(
-                nn.TransformerEncoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_encoder_layers
-            ) for _ in range(self.num_sources)
+                nn.TransformerEncoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True),
+                num_layers=self.num_encoder_layers) for _ in range(self.num_sources)
         ]) # Transformer encoders for each tokenisation
 
         # Using word-level tokenisation as the output
         self.decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True), num_layers=self.num_decoder_layers
-        )
+            nn.TransformerDecoderLayer(d_model=self.embedding_size, nhead=self.num_heads, dropout=self.dropout, batch_first=True),
+            num_layers=self.num_decoder_layers)
 
         # Output layer
         self.fc_out = nn.Linear(self.embedding_size, self.vocab_sizes["tgt_word_ids"])
@@ -273,16 +304,23 @@ class MultiSourceTransformer(BaseTransformer):
         """
         Generate a square subsequent mask for the decoder.
         Args:
-            size: The size of the mask.
+            size (int): The size of the mask.
         Returns:
-            A square subsequent mask.
+            (torch.Tensor): A square subsequent mask.
         """
         mask = torch.triu(torch.full((size, size), float("-inf")), diagonal=1).bool()
         return mask
 
 
-    def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor):
-
+    def forward(self, srcs: dict[str, torch.Tensor], tgt: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for the multi-source transformer model.
+        Args:
+            srcs (dict[str, torch.Tensor]): Dictionary of source sequences with tokenisation names as keys and tensors as values.
+            tgt (torch.Tensor): Target sequences.
+        Returns:
+            torch.Tensor: Output of the multi-source transformer model.
+        """
         # Separate the lattice positional encodings from the source tokenisations
         src_lpes = None
         if self.fusion_type == "lattice":

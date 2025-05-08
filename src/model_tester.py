@@ -1,3 +1,7 @@
+"""
+This module contains the TransformerTester class,
+which is responsible for evaluating a trained transformer model on a test dataset.
+"""
 import os
 import sys
 import numpy as np
@@ -10,12 +14,11 @@ from evaluate import load
 from rich.table import Table
 from rich.console import Console
 
-# Append project root to sys.path
-project_root = os.path.join(os.path.dirname(__file__), "..")
-if project_root not in sys.path:
-    sys.path.append(project_root)
 
 class TransformerTester:
+    """
+    A class to evaluate a trained transformer model on a test dataset.
+    """
     def __init__(self, test_loader, model, device, log_dir):
         self.test_loader = test_loader
         self.model = model
@@ -26,6 +29,9 @@ class TransformerTester:
 
 
     def load_model(self):
+        """
+        Load the best model checkpoint from the specified log directory.
+        """
         path = os.path.join(self.log_dir, "best_model.pth")
 
         if not os.path.exists(path):
@@ -35,16 +41,17 @@ class TransformerTester:
             self.model.load_state_dict(checkpoint["model"])
 
 
-    def calculate_bertscore(self, references: list[list[str]], candidates: list[list[str]]):
+    def calculate_bertscore(self, references: list[list[str]], candidates: list[list[str]]
+                            ) -> tuple[float, float, float]:
         """
         Calculate BERTScore for the given references and candidates.
 
         Arg(s):
-            - references: List of reference translations (list of lists).
-            - candidates: List of candidate translations (list of lists).
+            references (list[list[str]]): List of reference translations (list of lists).
+            candidates (list[list[str]]): List of candidate translations (list of lists).
 
         Returns:
-            - tuple: Mean precision, recall, and F1 score.
+            (tuple[float, float, float]): Mean precision, recall, and F1 score.
         """
         # Convert list of lists to list of strings
         references = [" ".join(ref[0]) for ref in references]
@@ -62,9 +69,14 @@ class TransformerTester:
         return precision, recall, f1
 
 
-    def calculate_oov_rates(self, sequences: dict):
+    def calculate_oov_rates(self, sequences: dict) -> tuple[float, float]:
         """
         Calculate the Out-Of-Vocabulary (OOV) rates for the given potential vocabularies.
+        Args:
+            sequences (dict): Dictionary containing the vocabularies to compare.
+
+        Returns:
+            (tuple[float, float]): Reference OOV rate and prediction OOV rate.
         """
         vocabs = {}
         for name, seq in sequences.items():
@@ -83,13 +95,13 @@ class TransformerTester:
         return reference_oov_rate, prediction_oov_rate
 
 
-    def calculate_unknown_rate(self, sequences: list[list[str]]):
+    def calculate_unknown_rate(self, sequences: list[list[str]]) -> float:
         """
         Calculate the unknown rate for the given list of lists.
         Arg(s):
-            - list[list[str]]: List of lists of strings.
+            sequences (list[list[str]]): List of lists of strings.
         Returns:
-            - float: The unknown rate.
+            float: The unknown rate.
         """
         total_tokens = sum(len(sublist) for sublist in sequences)
         unknown_tokens = sum(1 for sublist in sequences for token in sublist if token == "<unk>")
@@ -99,8 +111,10 @@ class TransformerTester:
     def get_vocab(self, dataset: list):
         """
         Get the vocabulary from the dataset
-        Arg(s):
-        - dataset: The dataset to get the vocabulary from - it should be a TokenDataset object
+        Args:
+            dataset (list): The dataset to get the vocabulary from
+        Returns:
+            set: The vocabulary
         """
         vocab = set()
         if isinstance(dataset, list):
@@ -118,18 +132,20 @@ class TransformerTester:
         return vocab
 
 
-    def evaluate(self, tgt_vocab, max_len, train_set, test_set, type: str = "greedy", beam_width: int = None):
+    def evaluate(self, tgt_vocab, max_len: int, train_set: list, test_set: list, type: str = "greedy", beam_width: int = None):
         """
         Evaluate the model on the test set using BLEU score.
         
-        Arg(s):
-            - tgt_vocab: Target vocabulary mapping tokens to indices; should contain "<sos>" and "<eos>".
-            - max_len: Maximum length for generated translations.
-            - type: Decoding type, either "greedy" or "beam".
-            - beam_width: Width of the beam for beam search decoding (only used if type is "beam").
+        Args:
+            tgt_vocab: Target vocabulary mapping tokens to indices; should contain "<sos>" and "<eos>".
+            max_len (int): Maximum length for generated translations.
+            train_set (list): Training set.
+            test_set (list): Test set.
+            type (str): Decoding type, either "greedy" or "beam".
+            beam_width (int): Width of the beam for beam search decoding (only used if type is "beam").
         
         Returns:
-            - float: The corpus BLEU score.
+            (float): The corpus BLEU score.
         """
         # Load the best model
         self.load_model()

@@ -1,6 +1,24 @@
+"""
+Main function for training and evaluating a Transformer model for machine translation.
+This script handles the following tasks:
+1. Data Preprocessing:
+   - Reads and tokenizes the input text data.
+   - Builds vocabularies and numericalizes the tokenized data.
+   - Creates a custom dataset and splits it into training, validation, and test sets.
+2. Model Definition:
+    - Defines the Transformer model or MultiSourceTransformer model based on the configuration.
+3. Model Training:
+    - Sets up the training loop with a specified loss function, optimizer, and learning rate scheduler.
+4. Model Evaluation:
+    - Evaluates the trained model on the test set using greedy decoding.
+5. Logging:
+    - Logs the training and evaluation results, including hyperparameters and model performance metrics.
+"""
+
 # Import dependencies
 import os
 import sys
+import json
 import torch
 from functools import partial
 from torch.utils.data import DataLoader
@@ -20,6 +38,7 @@ project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+# Import custom modules
 from src.preprocessor import Preprocessor
 from dataset import TokenDataset, MultiTokenDataset, collate_fn, collate_fn_multitokenisation
 from src.models import Transformer, MultiSourceTransformer
@@ -27,7 +46,7 @@ from src.model_trainer import TransformerTrainer
 from src.model_tester import TransformerTester
 from utils.logger import Logger
 from utils.config import config
-import json
+
 
 # Define the hyperparameters
 random_seed = 7
@@ -73,10 +92,6 @@ else:
     device = torch.device("cpu")
 print(f"Running on {device}")
 
-# Python executable path
-# This is the path to the Python executable in your conda environment
-# /home/zceerba/.conda/envs/nlp/bin/python
-
 def main():
     # Set random seed for reproducibility
     torch.manual_seed(random_seed)
@@ -90,7 +105,7 @@ def main():
     print("Raw text data read")
 
     # Create parallel data from text file
-    translation_dictionary = Preprocessor.create_parallel_data(text=lines, format="dict", save=False)
+    translation_dictionary = Preprocessor.create_parallel_data(text=lines, save=False)
     print("Created dictionary of parallel sentences")
 
     # Tokenise the data

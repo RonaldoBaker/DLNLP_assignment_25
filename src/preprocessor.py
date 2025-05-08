@@ -26,6 +26,7 @@ project_root = os.path.join(os.path.dirname(__file__), "..")
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+# Import custom modules
 from src.lattice import Lattice
 
 class Preprocessor:
@@ -49,10 +50,10 @@ class Preprocessor:
         each line being one element in the list.
 
         Args:
-            - path (str): The path to the text file
+            path (str): The path to the text file
         
         Returns:
-            - content (list[str]): The content of the text file as a list of strings
+            list[str]: The content of the text file as a list of strings
         """
         with open(file=path, mode="r", encoding="utf-8") as file:
             content = file.readlines()
@@ -60,18 +61,14 @@ class Preprocessor:
 
 
     @staticmethod
-    def create_parallel_data(text: list[str], format: str, save: bool = False
+    def create_parallel_data(text: list[str], save: bool = False
                              ) -> list[dict[str, str]]:
-        # TODO: Come back to this and see if I still need the tuple version so that I can
-        # remove it and fix the return type
         """
         Creates a dictionary of parallel sentences between source and target
         languages from a list of strings.
 
         Args:
-            - text (list[str]): The list of strings containing the parallel sentences
-            - format (str): The format in which to return the parallel sentences
-                            (either "dict" or "tuple")
+            text (list[str]): The list of strings containing the parallel sentences
             - save (bool): Whether to save the parallel sentences to a JSON file or not
 
         Returns:
@@ -96,35 +93,27 @@ class Preprocessor:
             spa_sentence = spa_sentence.strip().lower()
 
             # Add the sentences to the dictionary
-            if format == "dict":
-                translations.append({"src": eng_sentence, "tgt": spa_sentence})
-            elif format == "tuple":
-                translations.append((eng_sentence, spa_sentence))
+            translations.append({"src": eng_sentence, "tgt": spa_sentence})
 
         if save:
-            if format == "dict":
-                with open("data/translations_dict.json", "w") as file:
-                    json.dump(translations, file, indent=4)
-                    file.close()
-            elif format == "tuple":
-                with open("data/translations_tuples.json", "w") as file:
-                    json.dump([list(item) for item in translations], file, indent=4)
+            with open("data/translations_dict.json", "w") as file:
+                json.dump(translations, file, indent=4)
+                file.close()
 
         return translations
     
 
     @staticmethod
     def load_dataset(path: str) -> list[dict[str, str]]:
-        # TODO: check if I am removing the tuple version of this method
         """
         Loads the dataset from the given path and returns the parallel
         sentences as a list of dictionaries.
 
         Args:
-            - path (str): The path to the dataset file
+            path (str): The path to the dataset file
 
         Returns:
-            - (list[dict[str, str]]): The parallel sentences as a list of dictionaries or tuples
+            list[dict[str, str]]: The parallel sentences as a list of dictionaries
         """
         with open(path, "r") as file:
             data = json.load(file)
@@ -146,15 +135,16 @@ class Preprocessor:
         and returns the tokenised sentences as a dictionary.
 
         Args:
-            - pair (dict[str, str]): The pair of parallel sentences
-            - eng_tokeniser (spacy.langugage.Language): The English tokeniser
-            - spa_tokeniser (spacy.langugage.Language): The Spanish tokeniser
-            - sos_token (str): The start of sentence token
-            - eos_token (str): The end of sentence token
-            - max_length (int): The maximum length of the tokenised sentences
+            pair (dict[str, str]): The pair of parallel sentences
+            eng_tokeniser (spacy.langugage.Language): The English tokeniser
+            spa_tokeniser (spacy.langugage.Language): The Spanish tokeniser
+            sos_token (str): The start of sentence token
+            eos_token (str): The end of sentence token
+            max_length (int): The maximum length of the tokenised sentences
+            remove_underscore (bool): Whether to remove the underscore from the subword tokens
 
         Returns:
-            - (dict[str, str]): The tokenised sentences as a dictionary
+            dict[str, str]: The tokenised sentences as a dictionary
         """
         # Tokenise the text using the tokenisers from the dictionary
         # Word tokenisation
@@ -189,24 +179,27 @@ class Preprocessor:
             "src_char_tokens": src_char_tokens
             }
 
+        # Add the start of sentence and end of sentence tokens
         for key in tokenisations.keys():
             tokenisations[key] = [sos_token] + tokenisations[key] + [eos_token]
 
+        # Add the tokenisations to the pair
         pair.update(tokenisations)
+
         return pair
 
 
     @staticmethod
     def create_tokenised_dataset(translation_dictionary: dict[str, str], remove_underscore: bool = True) -> list[dict[str, str]]:
         """
-        Wraps the __create tokens function into a lambda function
+        Wraps the __create_tokens function into a lambda function
         and tokenises the parallel sentences in the given dictionary
 
         Args:
-            - translation_dictionary (dict[str, str]): The dictionary containing the parallel sentences
+            translation_dictionary (dict[str, str]): The dictionary containing the parallel sentences
 
         Returns:
-            - (list[dict[str, str]]): The tokenised parallel sentences as a list of dictionaries
+            list[dict[str, str]]: The tokenised parallel sentences as a list of dictionaries
         """
          # Create spacy tokenisers for word tokenisation
         src_word_tokeniser = spacy.load("es_core_news_sm")
@@ -219,6 +212,7 @@ class Preprocessor:
         src_syllable_tokeniser = LegalitySyllableTokenizer(words.words())
         src_char_tokeniser = CharTokenizer()
 
+        # Create a dictionary of tokenisers
         tokenisers = {"src_word_tokeniser": src_word_tokeniser,
                       "tgt_word_tokeniser": tgt_word_tokeniser,
                       "src_subword_tokeniser": src_subword_tokeniser,
@@ -237,10 +231,10 @@ class Preprocessor:
         from the tokenised data and returns the vocabulary of each language.
 
         Args:
-            - tokenised_data (list[dict[str, str]]): The tokenised data
+            tokenised_dictionaries (list[dict[str, str]]): The tokenised data
 
         Returns:
-            - (tuple[Vocab, Vocab]): The vocabulary for the source and target languages
+            dict[str, Vocab]: The vocabulary for the source and target languages
         """
         # Define special tokens
         special_tokens = ["<sos>", "<eos>", "<unk>", "<pad>"]
@@ -257,17 +251,16 @@ class Preprocessor:
 
 
     @staticmethod
-    def __token_to_index(tokenised_dictionary: dict[str, str], vocabularies: dict[str, Vocab]):
+    def __token_to_index(tokenised_dictionary: dict[str, str], vocabularies: dict[str, Vocab]) -> dict[str, str]:
         """
         Maps the tokens to their corresponding indices using the vocabulary.
 
         Args:
-            - data (dict[str, str]): The dictionary containing the tokens
-            - eng_vocab (Vocab): The English vocabulary
-            - spa_vocab (Vocab): The Spanish vocabulary
+            tokenised_dictionary (dict[str, str]): The dictionary containing the tokens
+            vocabularies (dict[str, Vocab]): The vocabularies for the source and target languages
         
         Returns:
-            - (dict[str, str]): The uypdated dictionary containing the indices
+            dict[str, str]: The updated dictionary containing the mapped indices
         """
 
         # Using class mapping to access in-built numericalization methods from each Vocab object
@@ -289,12 +282,11 @@ class Preprocessor:
         and converts the tokenised data to indices using the vocabulary.
 
         Args:
-            - tokenised_data (list[dict[str, str]]): The tokenised data
-            - eng_vocab (Vocab): The English vocabulary
-            - spa_vocab (Vocab): The Spanish vocabulary
+            tokenised_dictionaries (list[dict[str, str]]): The tokenised data
+            vocabularies (dict[str, Vocab]): The vocabularies for the source and target languages
 
         Returns:
-            - (list[dict]): The tokenised data as a list of dictionaries containing the indices
+            list[dict]: The tokenised data as a list of dictionaries containing the indices
         """
         return list(map(lambda x: Preprocessor.__token_to_index(x, vocabularies),
                         tqdm(tokenised_dictionaries, desc="Numericalising tokenised data", unit="dictionary", leave=True)))
@@ -305,13 +297,12 @@ class Preprocessor:
         """
         Generates the lattice positional encodings for the given dictionary.
 
-        Arg(s):
-            - dictionary (dict[str, str]): The dictionary containing the tokenised data
-            - device (str): The device to use for the tensors
-            - fine_grain_tokenisation (str): The fine-grain tokenisation to use
+        Args:
+            dictionary (dict[str, str]): The dictionary containing the tokenised data
+            fine_grain_tokenisation (str): The fine-grain tokenisation to use
 
         Returns:
-            - (dict[str, torch.Tensor]): The dictionary containing the lattice positional encodings
+            dict[str, torch.Tensor]: The dictionary containing the lattice positional encodings
         """
         # Create a lattice object - creates the lattice inherently
         lattice = Lattice(dictionary["src_word_tokens"], dictionary["src_" + fine_grain_tokenisation + "_tokens"], type=fine_grain_tokenisation)
@@ -347,11 +338,11 @@ class Preprocessor:
         Creates the lattice positional encodings for the given dictionaries.
 
         Args:
-            - dictionaries (list[dict[str, str]]): The dictionaries containing the tokenised data
-            - device (str): The device to use for the tensors
+            dictionaries (list[dict[str, str]]): The dictionaries containing the tokenised data
+            fine_grain_tokenisation (str): The fine-grain tokenisation to use
 
         Returns:
-            - (list[dict[str, torch.Tensor]]): The dictionaries containing the lattice positional encodings
+            list[dict[str, torch.Tensor]]: The dictionaries containing the lattice positional encodings
         """
         lattice_dicts = list(map(lambda x: Preprocessor.__generate_lpes(x, fine_grain_tokenisation),
                         tqdm(dictionaries, desc="Generating lattice positional encodings", unit="dictionary", leave=True)))

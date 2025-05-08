@@ -2,7 +2,6 @@
 This module contains the EarlyStopping class which is used to stop training
 when the loss does not improve for a certain number of epochs.
 """
-
 class EarlyStopping:
     def __init__(self, patience: int = 5, delta: int = 0, mode: str = 'min'):
         """

@@ -11,7 +11,7 @@ class Lattice:
         self.fine_grain_tokens = fine_grain_tokens
         self.graph = self.__build_lattice(word_tokens, fine_grain_tokens, type)
 
-    def __build_lattice(self, word_tokens, fine_grain_tokens, type: str):
+    def __build_lattice(self, word_tokens, fine_grain_tokens, type: str) -> nx.DiGraph:
         # Create a directed graph
         graph = nx.DiGraph()
 
@@ -80,12 +80,22 @@ class Lattice:
 
 
     def display_lattice(self):
+        """
+        Display the lattice in a readable format.
+        """
         print("Lattice:")
         for start, end, data in self.graph.edges(data=True):
             print(f"Edge from {start} to {end}: {data['token']} ({data['type']})")
 
 
-    def get_lattice_positional_encodings(self):
+    def get_lattice_positional_encodings(self) -> tuple[list[int], list[int]]:
+        """
+        Get the positional encodings for the lattice.
+        This function returns two lists of positional encodings:
+
+        Returns:
+            tuple[list[int], list[int]]: A tuple containing word LPEs and fine-grain LPEs.:
+        """
         # Store positional encodings for each edge in the lattice for each tokenisation
         word_lpes = []
         fine_grain_lpes = []

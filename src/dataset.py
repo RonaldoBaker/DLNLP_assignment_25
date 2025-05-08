@@ -1,3 +1,7 @@
+"""
+Custom dataset classes for the translation task.
+This module contains two dataset classes: `TokenDataset` and `MultiTokenDataset`.
+"""
 # Import dependencies
 import torch
 from torch.utils.data import Dataset
@@ -36,6 +40,9 @@ class TokenDataset(Dataset):
 
 
 class MultiTokenDataset(Dataset):
+    """
+    A custom dataset class for the translation task with multiple tokenisations.
+    """
     def __init__(self, indexed_dataset: dict[str, list[str]], chosen_tokenisations: list[str], device: str, embedding_dim: int = 512, fusion_type: str = "single"):
         self.indexed_data = indexed_dataset
         self.chosen_tokenisations = chosen_tokenisations
@@ -44,9 +51,15 @@ class MultiTokenDataset(Dataset):
         self.fusion_type = fusion_type
 
     def __len__(self):
+        """
+        Returns the length of the dataset.
+        """
         return len(self.indexed_data)
 
     def __getitem__(self, idx):
+        """
+        Returns the indexed source and target sentences at the given index.
+        """
         dictionary = self.indexed_data[idx]
 
         # Take the tokenisations that are in the chosen tokenisations
@@ -65,13 +78,27 @@ class MultiTokenDataset(Dataset):
 
 
 def collate_fn(batch, source_vocab, target_vocab):
+    """
+    Collate function for the TokenDataset.
+    """
     eng_tensors, spa_tensors = zip(*batch)
     eng_tensors = pad_sequence(eng_tensors, padding_value=source_vocab["<pad>"], batch_first=True)
     spa_tensors = pad_sequence(spa_tensors, padding_value=target_vocab["<pad>"], batch_first=True)
     return eng_tensors, spa_tensors
 
 
-def collate_fn_multitokenisation(batch, source_vocab, target_vocab, embedding_size: int = 512):
+def collate_fn_multitokenisation(batch, source_vocab, target_vocab, embedding_size: int = 512
+                                 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Collate function for the MultiTokenDataset.
+    Pads the source and target tensors and returns them as a tuple.
+
+    Args:
+        batch (list): A list of tuples containing the source and target tensors.
+        source_vocab (torchtext.Vocab): The source vocabulary.
+        target_vocab (torchtext.Vocab): The target vocabulary.
+        embedding_size (int): The size of the embeddings.
+    """
     dicts, tensors = zip(*batch)
 
     # Pad the dictionaries
@@ -90,12 +117,3 @@ def collate_fn_multitokenisation(batch, source_vocab, target_vocab, embedding_si
     padded_tensors = pad_sequence(tensors, padding_value=target_vocab["<pad>"], batch_first=True)
 
     return padded_dicts, padded_tensors
-    # if lpes is None:
-    #     # If no lattice positional encodings, return only the padded dictionaries and tensors
-    #     return padded_dicts, padded_tensors
-    # else:
-    #     # Pad the lattice positional encodings and expand to embedding dimension
-    #     padded_lpes = {key: pad_sequence([l[key] for l in lpes],
-    #                                     padding_value=0, batch_first=True).unsqueeze(2).expand(-1, -1, embedding_size)
-    #                                     for key in lpes[0].keys()}
-    #     return padded_dicts, padded_lpes, padded_tensors
