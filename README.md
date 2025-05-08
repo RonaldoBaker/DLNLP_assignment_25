@@ -44,6 +44,7 @@ Run the following commands to download other necessary dependencies:
 chmod +x setup.sh
 ./setup.sh
 ```
+**NOTE** Will need to use Git Bash or another terminal that can use Unix commands to run these commands. The python path will also need to be changed to your local python path in [setup.sh](setup.sh) before running,
 
 ## Running main.py
 The `main.py` runs with a number of CLI arguments. By default it will have the following arguments:
